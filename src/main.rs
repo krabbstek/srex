@@ -19,4 +19,13 @@ enum Commands {
 fn main() {
     let args = Cli::parse();
     println!("{:?}", args.cmd);
+
+    match args.cmd {
+        Commands::Create => {
+
+        },
+        Commands::Merge { output } => {
+
+        },
+    }
 }
