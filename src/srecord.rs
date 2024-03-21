@@ -55,8 +55,7 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     // Next, parse record type
     let record_type_char: char;
     match record_str.chars().nth(1) {
-        Some(c) if ('0'..='9').contains(&c) => { record_type_char = c; }
-        Some(c) => { return Result::Err(format!("Failed to parse '{record_str}': invalid record type '{c}'")); }
+        Some(c) => { record_type_char = c; }
         None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing record type")); }
     }
     let record_type: RecordType;
@@ -71,8 +70,7 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         '7' => { record_type = RecordType::S7; }
         '8' => { record_type = RecordType::S8; }
         '9' => { record_type = RecordType::S9; }
-        // This should never happen, but is still required by rust
-        _ => { panic!("Oh no, how on earth did we end up here?!"); }
+        c => { return Result::Err(format!("Failed to parse '{record_str}': invalid record type S{c}")); }
     }
 
     // Next, parse byte-count
