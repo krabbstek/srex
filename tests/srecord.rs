@@ -1,4 +1,4 @@
-use srex::srecord::calculate_checksum;
+use srex::srecord::*;
 
 #[test]
 fn test_calculate_checksum() {
@@ -12,4 +12,20 @@ fn test_calculate_checksum() {
         0x2E, 0x0A, 0x00]), 0x42);
     assert_eq!(calculate_checksum(0x03, 0x0003, &[]), 0xF9);
     assert_eq!(calculate_checksum(0x03, 0x0000, &[]), 0xFC);
+}
+
+#[test]
+fn test_parse_srecord() {
+
+    // Errors
+
+    // Empty string
+    assert!(parse_record("").is_err());
+    // Invalid first characters
+    assert!(parse_record("0").is_err());
+    // No record type
+    assert!(parse_record("S").is_err());
+    // Invalid record type
+    assert!(parse_record("SA").is_err());
+    assert!(parse_record("S4").is_err());
 }
