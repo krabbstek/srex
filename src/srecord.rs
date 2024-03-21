@@ -1,5 +1,8 @@
 use std::num::Wrapping;
 
+use hex::decode;
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum RecordType {
     S0, // Header
     S1, // 16-bit address data
@@ -14,11 +17,11 @@ pub enum RecordType {
 }
 
 pub struct Record {
-    record_type: RecordType,
-    byte_count: u8,
-    address: u32,
-    data: Vec<u8>, // TODO: array slice?
-    checksum: u8,
+    pub record_type: RecordType,
+    pub byte_count: u8,
+    pub address: u32,
+    pub data: Vec<u8>, // TODO: array slice?
+    pub checksum: u8,
 }
 
 pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
@@ -33,6 +36,10 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
 }
 
 /// Parse a record (single line) from an SRecord file.
+///
+/// TODO: Make string subslicing safe and fast
+///
+/// TODO: Add support for endianness
 pub fn parse_record(record_str: &str) -> Result<Record, String> {
     // First char is supposed to be an S
     match record_str.chars().next() {
@@ -73,12 +80,59 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     let byte_count_str = &record_str[2..4];
     match u8::from_str_radix(byte_count_str, 16) {
         Ok(i) => { byte_count = i; }
-        Err(_) => { return Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")); }
+        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")); }
     }
 
-    let address = 0;
-    let data = Vec::<u8>::from([]);
-    let checksum = calculate_checksum(byte_count, address, &data);
+    // Next, parse address
+    let num_address_bytes = match record_type {
+        RecordType::S0 => 2,
+        RecordType::S1 => 2,
+        RecordType::S2 => 3,
+        RecordType::S3 => 4,
+        RecordType::S5 => 2,
+        RecordType::S6 => 3,
+        RecordType::S7 => 4,
+        RecordType::S8 => 3,
+        RecordType::S9 => 2,
+    };
+    let num_address_chars = num_address_bytes * 2;
+    let address_str = &record_str[4..4+num_address_chars];
+    let address: u32;
+    match u32::from_str_radix(address_str, 16) {
+        Ok(i) => { address = i; }
+        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse address from '{address_str}'")); }
+    }
+
+    // Next, parse data
+    let data_start_index = 4 + num_address_chars;
+    let data_end_index = data_start_index + 2 * ((byte_count as usize) - num_address_bytes - 1);
+    let data_str = &record_str[data_start_index..data_end_index];
+    let data: Vec<u8>;
+    match hex::decode(data_str) {
+        Ok(vec) => { data = vec; }
+        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse data from '{data_str}'")); }
+    }
+
+    // Next, parse and validate checksum
+    let checksum_start_index = data_end_index;
+    let checksum_end_index = checksum_start_index + 2;
+    let checksum_str = &record_str[checksum_start_index..checksum_end_index];
+    let checksum: u8;
+    match u8::from_str_radix(checksum_str, 16) {
+        Ok(i) => { checksum = i; }
+        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse checksum from '{checksum_str}'")); }
+    }
+    let expected_checksum = calculate_checksum(byte_count, address, &data);
+    if checksum != expected_checksum {
+        return Result::Err(format!("Failed to parse '{record_str}': calculated checksum {expected_checksum:#02X} does not match parsed checksum {checksum:#02X}"));
+    }
+    // TODO: Validate checksum
+
+    // Finally, validate that we are at the end of the record str
+    if record_str.len() != checksum_end_index {
+        let remaining_str = &record_str[checksum_end_index..];
+        return Result::Err(format!("Failed to parse '{record_str}': expected {checksum_end_index} characters but the string slice continued with '{remaining_str}'"));
+    }
 
     Result::Ok(Record {
         record_type: record_type,
