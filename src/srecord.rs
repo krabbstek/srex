@@ -1,6 +1,6 @@
 use std::num::Wrapping;
 
-use hex::decode;
+use hex;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RecordType {
