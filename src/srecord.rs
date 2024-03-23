@@ -134,7 +134,6 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     if checksum != expected_checksum {
         return Result::Err(format!("Failed to parse '{record_str}': calculated checksum {expected_checksum:#02X} does not match parsed checksum {checksum:#02X}"));
     }
-    // TODO: Validate checksum
 
     // Finally, validate that we are at the end of the record str
     if record_str.len() != checksum_end_index {
