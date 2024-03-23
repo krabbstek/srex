@@ -1,6 +1,8 @@
 use std::num::Wrapping;
+use std::path::PathBuf;
 
 use hex;
+use log::*;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RecordType {
@@ -22,6 +24,14 @@ pub struct Record {
     pub address: u32,
     pub data: Vec<u8>, // TODO: array slice?
     pub checksum: u8,
+}
+
+pub struct SRecordFile {
+    pub file_path: Option<PathBuf>,
+    pub header_records: Vec<Record>,
+    pub data_records: Vec<Record>,
+    pub record_count: Option<u32>,
+    pub start_address: Option<u32>,
 }
 
 pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
@@ -139,4 +149,40 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         data: data,
         checksum: checksum,
     })
+}
+
+pub fn parse_srecord_str(srecord_str: &str) -> SRecordFile {
+    let mut srecord_file = SRecordFile {
+        file_path: None,
+        header_records: Vec::<Record>::new(),
+        data_records: Vec::<Record>::new(),
+        record_count: None,
+        start_address: None,
+    };
+
+    for line in srecord_str.lines() {
+        match parse_record(line) {
+            Ok(record) => {
+                match record.record_type {
+                    RecordType::S0 => { srecord_file.header_records.push(record); }
+                    RecordType::S1 | RecordType::S2 | RecordType::S3 => { srecord_file.data_records.push(record); }
+                    RecordType::S5 | RecordType::S6 => {
+                        if srecord_file.record_count != None {
+                            warn!(target: "srex", "Multiple record counts encountered");
+                        }
+                        srecord_file.record_count = Some(record.address);
+                    }
+                    RecordType::S7 | RecordType::S8 | RecordType::S9 => {
+                        if srecord_file.start_address != None {
+                            warn!(target: "srex", "Multiple start addresses encountered");
+                        }
+                        srecord_file.start_address = Some(record.address);
+                    }
+                }
+            }
+            Err(msg) => { panic!("{msg}"); }
+        }
+    }
+
+    srecord_file
 }

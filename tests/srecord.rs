@@ -1,3 +1,5 @@
+use std::fs;
+
 use srex::srecord::*;
 
 #[test]
@@ -15,7 +17,7 @@ fn test_calculate_checksum() {
 }
 
 #[test]
-fn test_parse_srecord() {
+fn test_parse_record() {
 
     // Test some simple strings
 
@@ -246,4 +248,13 @@ fn test_parse_srecord() {
     // Too long string
     assert!(parse_record("S107000001020304EE0").is_err());
 
+}
+
+#[test]
+fn test_parse_srecord_str() {
+    let srecord_str = fs::read_to_string("test.s19").unwrap();
+    let srecord_file = parse_srecord_str(&srecord_str);
+
+    assert_eq!(srecord_file.record_count, Some(3));
+    assert_eq!(srecord_file.start_address, Some(0));
 }
