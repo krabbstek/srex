@@ -26,11 +26,11 @@ pub struct Record {
     pub checksum: u8,
 }
 
+// TODO: Implement slicing to get data at address (or something)
 pub struct SRecordFile {
     pub file_path: Option<PathBuf>,
-    pub header_records: Vec<Record>,
-    pub data_records: Vec<Record>,
-    pub record_count: Option<u32>,
+    pub header_data: Vec<u8>,
+    pub data: Vec<(u32, Vec<u8>)>,
     pub start_address: Option<u32>,
 }
 
@@ -153,23 +153,41 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
 pub fn parse_srecord_str(srecord_str: &str) -> SRecordFile {
     let mut srecord_file = SRecordFile {
         file_path: None,
-        header_records: Vec::<Record>::new(),
-        data_records: Vec::<Record>::new(),
-        record_count: None,
+        header_data: Vec::<u8>::new(),
+        data: Vec::<(u32, Vec<u8>)>::new(),
         start_address: None,
     };
+
+    let mut num_data_records: u32 = 0;
 
     for line in srecord_str.lines() {
         match parse_record(line) {
             Ok(record) => {
                 match record.record_type {
-                    RecordType::S0 => { srecord_file.header_records.push(record); }
-                    RecordType::S1 | RecordType::S2 | RecordType::S3 => { srecord_file.data_records.push(record); }
-                    RecordType::S5 | RecordType::S6 => {
-                        if srecord_file.record_count != None {
-                            warn!(target: "srex", "Multiple record counts encountered");
+                    RecordType::S0 => {
+                        srecord_file.header_data.extend(&record.data);
+                    }
+                    RecordType::S1 | RecordType::S2 | RecordType::S3 => {
+                        // TODO: Validate record type (no mixes?)
+                        let mut is_added_to_existing_data_part = false;
+                        for data_part in srecord_file.data.iter_mut().rev() { // TODO: Rename data_part
+                            // Appending to existing data
+                            if record.address == (data_part.0 + data_part.1.len() as u32) {
+                                data_part.1.extend(&record.data);
+                                is_added_to_existing_data_part = true;
+                                break;
+                            }
                         }
-                        srecord_file.record_count = Some(record.address);
+                        if !is_added_to_existing_data_part {
+                            srecord_file.data.push((record.address, record.data));
+                        }
+                        num_data_records += 1;
+                    }
+                    RecordType::S5 | RecordType::S6 => {
+                        // TODO: Validate record count
+                        // * Only last in file
+                        // * Only once
+                        // * Ensure it matches number of encountered data records
                     }
                     RecordType::S7 | RecordType::S8 | RecordType::S9 => {
                         if srecord_file.start_address != None {

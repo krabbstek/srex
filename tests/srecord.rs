@@ -255,6 +255,7 @@ fn test_parse_srecord_str() {
     let srecord_str = fs::read_to_string("test.s19").unwrap();
     let srecord_file = parse_srecord_str(&srecord_str);
 
-    assert_eq!(srecord_file.record_count, Some(3));
+    // TODO: Validate data
+
     assert_eq!(srecord_file.start_address, Some(0));
 }
