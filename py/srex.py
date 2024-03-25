@@ -1,7 +1,36 @@
+from __future__ import annotations
+
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import List, Tuple
+
+
+class SRecordFile:
+    def __init__(self):
+        self.file_path = None
+        self.header_data = bytes()
+        self.data = bytes()
+        self.address_indices: List[Tuple[int, int]] = []
+
+    @classmethod
+    def from_str(cls, srecord_str: str) -> SRecordFile:
+        srecord_file = cls()
+        for line in srecord_str.splitlines():
+            record_type, byte_count, address, data, checksum = parse_line(line)
+            if record_type == 0:
+                srecord_file.header_data += data
+            elif record_type in (1, 2, 3):
+                srecord_file.data += data
+                for i, (start_address, end_address) in enumerate(srecord_file.address_indices):
+                    if start_address <= address < end_address:
+                        raise Exception(f"Duplicate data: 0x{address:0X}")
+                    if address == end_address:
+                        srecord_file.address_indices[i] = (start_address, end_address + len(data))
+                        break
+                else:
+                    srecord_file.address_indices.append((address, address + len(data)))
+        return srecord_file
 
 
 def parse_args(argv: List[str]) -> Namespace:
@@ -93,30 +122,7 @@ def main(argv: List[str]):
     args = parse_args(argv)
 
     input_file: Path = args.input_file
-    input_lines = input_file.read_text().strip().splitlines()
-
-    header_records = []
-    data_records = []
-    start_address = None
-    count = None
-
-    file_record_type = None
-    for line in input_lines:
-        record_type, byte_count, address, data, checksum = parse_line(line)
-        file_record_type = validate_file_record_type(record_type, file_record_type)
-        match record_type:
-            case 0:
-                header_records.append(data)
-            case 1 | 2 | 3:
-                data_records.append((record_type, byte_count, address, data, checksum))
-            case 5 | 6:
-                if count is not None:
-                    raise SyntaxError(f"Multiple count records found")
-                count = address
-            case 7 | 8 | 9:
-                if start_address is not None:
-                    raise SyntaxError(f"Multiple start addresses found")
-                start_address = address
+    srecord_file = SRecordFile.from_str(input_file.read_text())
 
 if __name__ == "__main__":
     main(sys.argv[1:])
