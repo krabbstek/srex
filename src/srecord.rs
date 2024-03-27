@@ -85,10 +85,14 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
 
     // Next, parse byte-count
     let byte_count: u8;
-    let byte_count_str = &record_str[2..4];
-    match u8::from_str_radix(byte_count_str, 16) {
-        Ok(i) => { byte_count = i; }
-        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")); }
+    match record_str.get(2..4) {
+        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing byte count")); }
+        Some(byte_count_str) => {
+            match u8::from_str_radix(byte_count_str, 16) {
+                Ok(i) => { byte_count = i; }
+                Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")); }
+            }
+        }
     }
 
     // Next, parse address
@@ -104,31 +108,43 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         RecordType::S9 => 2,
     };
     let num_address_chars = num_address_bytes * 2;
-    let address_str = &record_str[4..4+num_address_chars];
     let address: u32;
-    match u32::from_str_radix(address_str, 16) {
-        Ok(i) => { address = i; }
-        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse address from '{address_str}'")); }
+    match record_str.get(4..4+num_address_chars) {
+        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing address")); }
+        Some(address_str) => {
+            match u32::from_str_radix(address_str, 16) {
+                Ok(i) => { address = i; }
+                Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse address from '{address_str}'")); }
+            }
+        }
     }
 
     // Next, parse data
     let data_start_index = 4 + num_address_chars;
     let data_end_index = data_start_index + 2 * ((byte_count as usize) - num_address_bytes - 1);
-    let data_str = &record_str[data_start_index..data_end_index];
     let data: Vec<u8>;
-    match hex::decode(data_str) {
-        Ok(vec) => { data = vec; }
-        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse data from '{data_str}'")); }
+    match record_str.get(data_start_index..data_end_index) {
+        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing data")); }
+        Some(data_str) => {
+            match hex::decode(data_str) {
+                Ok(vec) => { data = vec; }
+                Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse data from '{data_str}'")); }
+            }
+        }
     }
 
     // Next, parse and validate checksum
     let checksum_start_index = data_end_index;
     let checksum_end_index = checksum_start_index + 2;
-    let checksum_str = &record_str[checksum_start_index..checksum_end_index];
     let checksum: u8;
-    match u8::from_str_radix(checksum_str, 16) {
-        Ok(i) => { checksum = i; }
-        Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse checksum from '{checksum_str}'")); }
+    match record_str.get(checksum_start_index..checksum_end_index) {
+        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing checksum")); }
+        Some(checksum_str) => {
+            match u8::from_str_radix(checksum_str, 16) {
+                Ok(i) => { checksum = i; }
+                Err(_) => { return Result::Err(format!("Failed to parse '{record_str}': could not parse checksum from '{checksum_str}'")); }
+            }
+        }
     }
     let expected_checksum = calculate_checksum(byte_count, address, &data);
     if checksum != expected_checksum {

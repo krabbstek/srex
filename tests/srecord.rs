@@ -210,7 +210,6 @@ fn test_parse_record() {
     }
 
     // Errors
-    // TODO: Some checks are commented out since safe string slicing is not implemented yet
 
     // Empty string
     assert!(parse_record("").is_err());
@@ -224,22 +223,24 @@ fn test_parse_record() {
     assert!(parse_record("S4").is_err());
 
     // No byte count
-    // assert!(parse_record("S1").is_err());
+    assert!(parse_record("S1").is_err());
     // Invalid byte count
     assert!(parse_record("S1FG").is_err());
 
     // No address
-    // assert!(parse_record("S107").is_err());
+    assert!(parse_record("S107").is_err());
     // Invalid byte count
     assert!(parse_record("S107xxxx").is_err());
 
     // No data
-    // assert!(parse_record("S1070000").is_err());
+    assert!(parse_record("S1070000").is_err());
+    // Too short data
+    assert!(parse_record("S10700001234").is_err());
     // Invalid data
     assert!(parse_record("S1070000xxxxxxxx").is_err());
 
     // No checksum
-    // assert!(parse_record("S107000001020304").is_err());
+    assert!(parse_record("S107000001020304").is_err());
     // Invalid checksum
     assert!(parse_record("S107000001020304xx").is_err());
     // Incorrect checksum
