@@ -283,3 +283,9 @@ fn test_parse_srecord_unsorted_data() {
 fn test_parse_srecord_error() {
     assert!(parse_srecord_str("S").is_err());
 }
+
+#[test]
+fn test_parse_srecord_multiple_start_addresses() {
+    let srecord_str = fs::read_to_string("tests/srec_files/multiple_start_addresses.s19").unwrap();
+    assert!(parse_srecord_str(&srecord_str).is_err());
+}

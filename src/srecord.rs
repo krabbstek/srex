@@ -225,7 +225,7 @@ pub fn parse_srecord_str(srecord_str: &str) -> Result<SRecordFile, String> {
                     }
                     RecordType::S7 | RecordType::S8 | RecordType::S9 => {
                         if srecord_file.start_address != None {
-                            warn!(target: "srex", "Multiple start addresses encountered");
+                            return Result::Err(String::from("Failed to parse SRecord: multiple start address records found"));
                         }
                         srecord_file.start_address = Some(record.address);
                     }
