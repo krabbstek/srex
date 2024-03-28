@@ -34,6 +34,27 @@ pub struct SRecordFile {
     pub start_address: Option<u32>,
 }
 
+impl SRecordFile {
+    /// Sorts data address ascending, and merges adjacent data together
+    pub fn sort_data(&mut self) {
+        self.data.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut new_data = Vec::<(u32, Vec<u8>)>::new();
+        for (address, vec) in self.data.iter() {
+            match new_data.last_mut() {
+                Some(c) => {
+                    if *address as u64 == c.0 as u64 + c.1.len() as u64 {
+                        c.1.extend(vec);
+                    } else {
+                        new_data.push((*address, vec.to_vec()));
+                    }
+                }
+                None => { new_data.push((*address, vec.to_vec())); }
+            }
+        }
+        self.data = new_data;
+    }
+}
+
 pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
     let mut checksum = Wrapping(byte_count);
     for byte in address.to_be_bytes().iter() {
@@ -120,8 +141,9 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     }
 
     // Next, parse data
+    println!("{record_str}");
     let data_start_index = 4 + num_address_chars;
-    let data_end_index = data_start_index + 2 * ((byte_count as usize) - num_address_bytes - 1);
+    let data_end_index = data_start_index + 2 * (byte_count as usize) - 2 * (num_address_bytes + 1);
     let data: Vec<u8>;
     match record_str.get(data_start_index..data_end_index) {
         None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing data")); }
@@ -216,6 +238,8 @@ pub fn parse_srecord_str(srecord_str: &str) -> SRecordFile {
             Err(msg) => { panic!("{msg}"); }
         }
     }
+
+    srecord_file.sort_data();
 
     srecord_file
 }
