@@ -67,10 +67,6 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
 }
 
 /// Parse a record (single line) from an SRecord file.
-///
-/// TODO: Make string subslicing safe and fast
-///
-/// TODO: Add support for endianness
 pub fn parse_record(record_str: &str) -> Result<Record, String> {
     // First char is supposed to be an S
     match record_str.chars().next() {
@@ -188,7 +184,7 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     })
 }
 
-pub fn parse_srecord_str(srecord_str: &str) -> SRecordFile {
+pub fn parse_srecord_str(srecord_str: &str) -> Result<SRecordFile, String> {
     let mut srecord_file = SRecordFile {
         file_path: None,
         header_data: Vec::<u8>::new(),
@@ -235,11 +231,11 @@ pub fn parse_srecord_str(srecord_str: &str) -> SRecordFile {
                     }
                 }
             }
-            Err(msg) => { panic!("{msg}"); }
+            Err(msg) => { return Result::Err(msg); }
         }
     }
 
     srecord_file.sort_data();
 
-    srecord_file
+    Ok(srecord_file)
 }
