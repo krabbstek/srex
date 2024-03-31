@@ -252,9 +252,18 @@ fn test_parse_record() {
 }
 
 #[test]
-fn test_parse_srecord_str() {
+fn test_srecord_file_new() {
+    let srecord_file = SRecordFile::new();
+    assert_eq!(srecord_file.file_path, None);
+    assert_eq!(srecord_file.header_data, []);
+    assert_eq!(srecord_file.data, []);
+    assert_eq!(srecord_file.start_address, None);
+}
+
+#[test]
+fn test_srecord_file_from_str() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     assert_eq!(srecord_file.header_data, Vec::<u8>::from([ 0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00 ]));
     assert_eq!(srecord_file.data, Vec::<(u32, Vec<u8>)>::from([(0x0000, Vec::<u8>::from([
@@ -271,7 +280,7 @@ fn test_parse_srecord_str() {
 #[test]
 fn test_parse_srecord_unsorted_data() {
     let srecord_str = fs::read_to_string("tests/srec_files/unsorted.s28").unwrap();
-    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     assert_eq!(srecord_file.header_data, []);
     assert_eq!(srecord_file.data, [(0x01, Vec::<u8>::from([0x01, 0x02, 0x03])), (0x05, Vec::<u8>::from([0x05]))]);
@@ -281,19 +290,19 @@ fn test_parse_srecord_unsorted_data() {
 
 #[test]
 fn test_parse_srecord_error() {
-    assert!(parse_srecord_str("S").is_err());
+    assert!(SRecordFile::from_str("S").is_err());
 }
 
 #[test]
 fn test_parse_srecord_multiple_start_addresses() {
     let srecord_str = fs::read_to_string("tests/srec_files/multiple_start_addresses.s19").unwrap();
-    assert!(parse_srecord_str(&srecord_str).is_err());
+    assert!(SRecordFile::from_str(&srecord_str).is_err());
 }
 
 #[test]
 fn test_srecord_file_index() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     assert_eq!(srecord_file[0x00], 0x7C);
     assert_eq!(srecord_file[0x01], 0x08);
@@ -303,7 +312,7 @@ fn test_srecord_file_index() {
 #[test]
 fn test_srecord_file_index_mut() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let mut srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let mut srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     assert_eq!(srecord_file[0x00], 0x7C);
     srecord_file[0x00] = 0xFF;
@@ -314,7 +323,7 @@ fn test_srecord_file_index_mut() {
 #[should_panic]
 fn test_srecord_file_index_error() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     let x = srecord_file[0xFF];
     println!("This should not be printed: {x:#02X}");
@@ -324,7 +333,7 @@ fn test_srecord_file_index_error() {
 #[should_panic]
 fn test_srecord_file_index_mut_error() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let mut srecord_file = parse_srecord_str(&srecord_str).unwrap();
+    let mut srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     srecord_file[0xFF] = 0x00;
     let x = srecord_file[0xFF];

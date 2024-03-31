@@ -35,6 +35,71 @@ pub struct SRecordFile {
 }
 
 impl SRecordFile {
+    pub fn new() -> Self {
+        SRecordFile {
+            file_path: None,
+            header_data: Vec::<u8>::new(),
+            data: Vec::<(u32, Vec<u8>)>::new(),
+            start_address: None,
+        }
+    }
+
+    pub fn from_str(srecord_str: &str) -> Result<Self, String> {
+        let mut srecord_file = SRecordFile {
+            file_path: None,
+            header_data: Vec::<u8>::new(),
+            data: Vec::<(u32, Vec<u8>)>::new(),
+            start_address: None,
+        };
+
+        let mut num_data_records: u32 = 0;
+
+        for line in srecord_str.lines() {
+            match parse_record(line) {
+                Ok(record) => {
+                    match record.record_type {
+                        RecordType::S0 => {
+                            srecord_file.header_data.extend(&record.data);
+                        }
+                        RecordType::S1 | RecordType::S2 | RecordType::S3 => {
+                            // TODO: Validate record type (no mixes?)
+                            let mut is_added_to_existing_data_part = false;
+                            for data_part in srecord_file.data.iter_mut().rev() { // TODO: Rename data_part
+                                // Appending to existing data
+                                if record.address == (data_part.0 + data_part.1.len() as u32) {
+                                    data_part.1.extend(&record.data);
+                                    is_added_to_existing_data_part = true;
+                                    break;
+                                }
+                            }
+                            if !is_added_to_existing_data_part {
+                                srecord_file.data.push((record.address, record.data));
+                            }
+                            num_data_records += 1;
+                        }
+                        RecordType::S5 | RecordType::S6 => {
+                            // TODO: Validate record count
+                            // * Only last in file
+                            // * Only once
+                            // * Ensure it matches number of encountered data records
+                        }
+                        RecordType::S7 | RecordType::S8 | RecordType::S9 => {
+                            if srecord_file.start_address != None {
+                                return Result::Err(String::from("Failed to parse SRecord: multiple start address records found"));
+                            }
+                            srecord_file.start_address = Some(record.address);
+                        }
+                    }
+                }
+                Err(msg) => { return Result::Err(msg); }
+            }
+        }
+
+        srecord_file.sort_data();
+
+        Ok(srecord_file)
+    }
+
     /// Sorts data address ascending, and merges adjacent data together
     pub fn sort_data(&mut self) {
         self.data.sort_by(|a, b| a.0.cmp(&b.0));
@@ -212,60 +277,4 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         data: data,
         checksum: checksum,
     })
-}
-
-pub fn parse_srecord_str(srecord_str: &str) -> Result<SRecordFile, String> {
-    let mut srecord_file = SRecordFile {
-        file_path: None,
-        header_data: Vec::<u8>::new(),
-        data: Vec::<(u32, Vec<u8>)>::new(),
-        start_address: None,
-    };
-
-    let mut num_data_records: u32 = 0;
-
-    for line in srecord_str.lines() {
-        match parse_record(line) {
-            Ok(record) => {
-                match record.record_type {
-                    RecordType::S0 => {
-                        srecord_file.header_data.extend(&record.data);
-                    }
-                    RecordType::S1 | RecordType::S2 | RecordType::S3 => {
-                        // TODO: Validate record type (no mixes?)
-                        let mut is_added_to_existing_data_part = false;
-                        for data_part in srecord_file.data.iter_mut().rev() { // TODO: Rename data_part
-                            // Appending to existing data
-                            if record.address == (data_part.0 + data_part.1.len() as u32) {
-                                data_part.1.extend(&record.data);
-                                is_added_to_existing_data_part = true;
-                                break;
-                            }
-                        }
-                        if !is_added_to_existing_data_part {
-                            srecord_file.data.push((record.address, record.data));
-                        }
-                        num_data_records += 1;
-                    }
-                    RecordType::S5 | RecordType::S6 => {
-                        // TODO: Validate record count
-                        // * Only last in file
-                        // * Only once
-                        // * Ensure it matches number of encountered data records
-                    }
-                    RecordType::S7 | RecordType::S8 | RecordType::S9 => {
-                        if srecord_file.start_address != None {
-                            return Result::Err(String::from("Failed to parse SRecord: multiple start address records found"));
-                        }
-                        srecord_file.start_address = Some(record.address);
-                    }
-                }
-            }
-            Err(msg) => { return Result::Err(msg); }
-        }
-    }
-
-    srecord_file.sort_data();
-
-    Ok(srecord_file)
 }
