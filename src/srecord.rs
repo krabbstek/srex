@@ -82,9 +82,13 @@ impl SRecordFile {
                             // * Only last in file
                             // * Only once
                             // * Ensure it matches number of encountered data records
+                            let file_num_records = record.address;
+                            if num_data_records != file_num_records {
+                                return Result::Err(format!("Failed to parse SRecord: Number of records found in file ({num_data_records:#02X}) does not match record count in file ({line} - {file_num_records:#02X}"));
+                            }
                         }
                         RecordType::S7 | RecordType::S8 | RecordType::S9 => {
-                            if srecord_file.start_address != None {
+                            if srecord_file.start_address.is_some() {
                                 return Result::Err(String::from("Failed to parse SRecord: multiple start address records found"));
                             }
                             srecord_file.start_address = Some(record.address);
@@ -179,7 +183,7 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     match record_str.chars().nth(1) {
         Some(c) => { record_type_char = c; }
         None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing record type")); }
-    }
+    };
     let record_type: RecordType;
     match record_type_char {
         '0' => { record_type = RecordType::S0; }
@@ -193,7 +197,7 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         '8' => { record_type = RecordType::S8; }
         '9' => { record_type = RecordType::S9; }
         c => { return Result::Err(format!("Failed to parse '{record_str}': invalid record type S{c}")); }
-    }
+    };
 
     // Next, parse byte-count
     let byte_count: u8;
@@ -271,10 +275,10 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     }
 
     Result::Ok(Record {
-        record_type: record_type,
-        byte_count: byte_count,
-        address: address,
-        data: data,
-        checksum: checksum,
+        record_type,
+        byte_count,
+        address,
+        data,
+        checksum,
     })
 }

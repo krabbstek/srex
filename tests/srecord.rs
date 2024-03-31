@@ -300,6 +300,12 @@ fn test_parse_srecord_multiple_start_addresses() {
 }
 
 #[test]
+fn test_parse_srecord_invalid_record_count() {
+    let srecord_str = fs::read_to_string("tests/srec_files/invalid_record_count.s19").unwrap();
+    assert!(SRecordFile::from_str(&srecord_str).is_err());
+}
+
+#[test]
 fn test_srecord_file_index() {
     let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
     let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
