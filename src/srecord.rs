@@ -1,8 +1,8 @@
 use std::num::Wrapping;
+use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
 
 use hex;
-use log::*;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RecordType {
@@ -52,6 +52,36 @@ impl SRecordFile {
             }
         }
         self.data = new_data;
+    }
+}
+
+impl Index<u32> for SRecordFile {
+    type Output = u8;
+
+    fn index(&self, address: u32) -> &Self::Output {
+        let address = address as u64;
+        for (start_address, data) in &self.data {
+            let start_address = *start_address as u64;
+            let end_address = start_address + data.len() as u64;
+            if (start_address <= address) && (address < end_address) {
+                return &data[(address - start_address) as usize];
+            }
+        }
+        panic!("Address {address:#02X} does not exist in SRecordFile");
+    }
+}
+
+impl IndexMut<u32> for SRecordFile {
+    fn index_mut(&mut self, address: u32) -> &mut Self::Output {
+        let address = address as u64;
+        for (start_address, data) in self.data.iter_mut() {
+            let start_address = *start_address as u64;
+            let end_address = start_address + data.len() as u64;
+            if (start_address <= address) && (address < end_address) {
+                return &mut data[(address - start_address) as usize];
+            }
+        }
+        panic!("Address {address:#02X} does not exist in SRecordFile");
     }
 }
 

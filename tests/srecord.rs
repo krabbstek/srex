@@ -289,3 +289,44 @@ fn test_parse_srecord_multiple_start_addresses() {
     let srecord_str = fs::read_to_string("tests/srec_files/multiple_start_addresses.s19").unwrap();
     assert!(parse_srecord_str(&srecord_str).is_err());
 }
+
+#[test]
+fn test_srecord_file_index() {
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
+    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+
+    assert_eq!(srecord_file[0x00], 0x7C);
+    assert_eq!(srecord_file[0x01], 0x08);
+    assert_eq!(srecord_file[0x3F], 0x6F);
+}
+
+#[test]
+fn test_srecord_file_index_mut() {
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
+    let mut srecord_file = parse_srecord_str(&srecord_str).unwrap();
+
+    assert_eq!(srecord_file[0x00], 0x7C);
+    srecord_file[0x00] = 0xFF;
+    assert_eq!(srecord_file[0x00], 0xFF);
+}
+
+#[test]
+#[should_panic]
+fn test_srecord_file_index_error() {
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
+    let srecord_file = parse_srecord_str(&srecord_str).unwrap();
+
+    let x = srecord_file[0xFF];
+    println!("This should not be printed: {x:#02X}");
+}
+
+#[test]
+#[should_panic]
+fn test_srecord_file_index_mut_error() {
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
+    let mut srecord_file = parse_srecord_str(&srecord_str).unwrap();
+
+    srecord_file[0xFF] = 0x00;
+    let x = srecord_file[0xFF];
+    println!("This should not be printed: {x:#02X}");
+}
