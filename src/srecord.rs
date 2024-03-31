@@ -1,6 +1,7 @@
 use std::num::Wrapping;
 use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use hex;
 
@@ -34,23 +35,20 @@ pub struct SRecordFile {
     pub start_address: Option<u32>,
 }
 
-impl SRecordFile {
-    pub fn new() -> Self {
-        SRecordFile {
-            file_path: None,
-            header_data: Vec::<u8>::new(),
-            data: Vec::<(u32, Vec<u8>)>::new(),
-            start_address: None,
-        }
+impl Default for SRecordFile {
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    pub fn from_str(srecord_str: &str) -> Result<Self, String> {
-        let mut srecord_file = SRecordFile {
-            file_path: None,
-            header_data: Vec::<u8>::new(),
-            data: Vec::<(u32, Vec<u8>)>::new(),
-            start_address: None,
-        };
+#[derive(Debug, PartialEq, Eq)]
+pub struct SRecordParseError(String);
+
+impl FromStr for SRecordFile {
+    type Err = SRecordParseError;
+
+    fn from_str(srecord_str: &str) -> Result<Self, Self::Err> {
+        let mut srecord_file = SRecordFile::new();
 
         let mut num_data_records: u32 = 0;
 
@@ -84,24 +82,35 @@ impl SRecordFile {
                             // * Ensure it matches number of encountered data records
                             let file_num_records = record.address;
                             if num_data_records != file_num_records {
-                                return Result::Err(format!("Failed to parse SRecord: Number of records found in file ({num_data_records:#02X}) does not match record count in file ({line} - {file_num_records:#02X}"));
+                                return Result::Err(SRecordParseError(format!("Failed to parse SRecord: Number of records found in file ({num_data_records:#02X}) does not match record count in file ({line} - {file_num_records:#02X}")));
                             }
                         }
                         RecordType::S7 | RecordType::S8 | RecordType::S9 => {
                             if srecord_file.start_address.is_some() {
-                                return Result::Err(String::from("Failed to parse SRecord: multiple start address records found"));
+                                return Result::Err(SRecordParseError(String::from("Failed to parse SRecord: multiple start address records found")));
                             }
                             srecord_file.start_address = Some(record.address);
                         }
                     }
                 }
-                Err(msg) => { return Result::Err(msg); }
+                Err(msg) => { return Result::Err(SRecordParseError(msg)); }
             }
         }
 
         srecord_file.sort_data();
 
         Ok(srecord_file)
+    }
+}
+
+impl SRecordFile {
+    pub fn new() -> Self {
+        SRecordFile {
+            file_path: None,
+            header_data: Vec::<u8>::new(),
+            data: Vec::<(u32, Vec<u8>)>::new(),
+            start_address: None,
+        }
     }
 
     /// Sorts data address ascending, and merges adjacent data together
@@ -179,23 +188,21 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     }
 
     // Next, parse record type
-    let record_type_char: char;
-    match record_str.chars().nth(1) {
-        Some(c) => { record_type_char = c; }
-        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing record type")); }
+    let record_type_char = match record_str.chars().nth(1) {
+        Some(c) => c,
+        None => { return Result::Err(format!("Failed to parse '{record_str}': unexpected end of string when parsing record type")); },
     };
-    let record_type: RecordType;
-    match record_type_char {
-        '0' => { record_type = RecordType::S0; }
-        '1' => { record_type = RecordType::S1; }
-        '2' => { record_type = RecordType::S2; }
-        '3' => { record_type = RecordType::S3; }
+    let record_type = match record_type_char {
+        '0' => RecordType::S0,
+        '1' => RecordType::S1,
+        '2' => RecordType::S2,
+        '3' => RecordType::S3,
         '4' => { return Result::Err(format!("Failed to parse '{record_str}': record type S4 is reserved")); }
-        '5' => { record_type = RecordType::S5; }
-        '6' => { record_type = RecordType::S6; }
-        '7' => { record_type = RecordType::S7; }
-        '8' => { record_type = RecordType::S8; }
-        '9' => { record_type = RecordType::S9; }
+        '5' => RecordType::S5,
+        '6' => RecordType::S6,
+        '7' => RecordType::S7,
+        '8' => RecordType::S8,
+        '9' => RecordType::S9,
         c => { return Result::Err(format!("Failed to parse '{record_str}': invalid record type S{c}")); }
     };
 

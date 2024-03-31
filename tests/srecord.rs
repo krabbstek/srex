@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, str::FromStr};
 
 use srex::srecord::*;
 
@@ -254,6 +254,15 @@ fn test_parse_record() {
 #[test]
 fn test_srecord_file_new() {
     let srecord_file = SRecordFile::new();
+    assert_eq!(srecord_file.file_path, None);
+    assert_eq!(srecord_file.header_data, []);
+    assert_eq!(srecord_file.data, []);
+    assert_eq!(srecord_file.start_address, None);
+}
+
+#[test]
+fn test_srecord_file_default() {
+    let srecord_file = Option::<SRecordFile>::None.unwrap_or_default();
     assert_eq!(srecord_file.file_path, None);
     assert_eq!(srecord_file.header_data, []);
     assert_eq!(srecord_file.data, []);

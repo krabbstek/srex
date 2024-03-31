@@ -24,7 +24,7 @@ fn main() {
         Commands::Create => {
 
         },
-        Commands::Merge { output } => {
+        Commands::Merge { output: _ } => {
 
         },
     }
