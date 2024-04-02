@@ -136,6 +136,24 @@ impl SRecordFile {
 impl Index<u32> for SRecordFile {
     type Output = u8;
 
+    /// Index the data inside the [`SRecordFile`] using the syntax
+    /// `srecord_file[0x1234]`, where `0x1234` is the address inside the SRecord file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_file: SRecordFile;
+    ///
+    /// // This will panic if 0x1234 does not exist in srecord_file
+    /// let value: u8 = srecord_file[0x1234];
+    /// println!("value = {value}");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the SRecord file.
     fn index(&self, address: u32) -> &Self::Output {
         let address = address as u64;
         for (start_address, data) in &self.data {
