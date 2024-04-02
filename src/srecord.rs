@@ -257,6 +257,22 @@ impl IndexMut<u32> for SRecordFile {
     }
 }
 
+/// Calculate the checksum for a single record (line).
+///
+/// The checksum is calculated from the sum of all the individual bytes, from `byte_count`,
+/// individual `address` bytes and all bytes in `data`. All but the least significant byte is
+/// discarded, and is then bitwise inverted.
+///
+/// # Example
+///
+/// ```
+/// use srex::srecord::calculate_checksum;
+/// let byte_count: u8 = 0x07;
+/// let address: u32 = 0x1234;
+/// let data: &[u8] = &[0x01, 0x02, 0x03, 0x04];
+///
+/// assert_eq!(calculate_checksum(byte_count, address, data), 0xA8);
+/// ```
 pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
     let mut checksum = Wrapping(byte_count);
     for byte in address.to_be_bytes().iter() {
