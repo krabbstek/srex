@@ -2,7 +2,6 @@ use core::ops::Range;
 
 use std::num::Wrapping;
 use std::ops::{Index, IndexMut};
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use hex;
@@ -30,9 +29,7 @@ pub struct Record {
 }
 
 #[derive(Debug)]
-// TODO: Implement slicing to get data at address (or something)
 pub struct SRecordFile {
-    pub file_path: Option<PathBuf>,
     pub header_data: Vec<u8>,
     pub data: Vec<(u32, Vec<u8>)>,
     pub start_address: Option<u32>,
@@ -109,7 +106,6 @@ impl FromStr for SRecordFile {
 impl SRecordFile {
     pub fn new() -> Self {
         SRecordFile {
-            file_path: None,
             header_data: Vec::<u8>::new(),
             data: Vec::<(u32, Vec<u8>)>::new(),
             start_address: None,

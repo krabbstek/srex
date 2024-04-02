@@ -254,7 +254,6 @@ fn test_parse_record() {
 #[test]
 fn test_srecord_file_new() {
     let srecord_file = SRecordFile::new();
-    assert_eq!(srecord_file.file_path, None);
     assert_eq!(srecord_file.header_data, []);
     assert_eq!(srecord_file.data, []);
     assert_eq!(srecord_file.start_address, None);
@@ -263,7 +262,6 @@ fn test_srecord_file_new() {
 #[test]
 fn test_srecord_file_default() {
     let srecord_file = Option::<SRecordFile>::None.unwrap_or_default();
-    assert_eq!(srecord_file.file_path, None);
     assert_eq!(srecord_file.header_data, []);
     assert_eq!(srecord_file.data, []);
     assert_eq!(srecord_file.start_address, None);
@@ -282,7 +280,6 @@ fn test_srecord_file_from_str() {
         0x00, 0x14, 0x38, 0x21, 0x00, 0x10, 0x7C, 0x08, 0x03, 0xA6, 0x4E, 0x80, 0x00, 0x20,
         0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x2E, 0x0A, 0x00,
     ]))]));
-    assert!(srecord_file.file_path.is_none());
     assert_eq!(srecord_file.start_address, Some(0));
 }
 
@@ -293,7 +290,6 @@ fn test_parse_srecord_unsorted_data() {
 
     assert_eq!(srecord_file.header_data, []);
     assert_eq!(srecord_file.data, [(0x01, Vec::<u8>::from([0x01, 0x02, 0x03])), (0x05, Vec::<u8>::from([0x05]))]);
-    assert!(srecord_file.file_path.is_none());
     assert_eq!(srecord_file.start_address, Some(0x00));
 }
 
