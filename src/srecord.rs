@@ -219,7 +219,8 @@ impl Index<Range<u32>> for SRecordFile
     ///
     /// # Panics
     ///
-    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the SRecord file.
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
+    /// the SRecord file.
     fn index(&self, address_range: Range<u32>) -> &Self::Output {
         match self.get_vec_containing_address(address_range.start) {
             Some((_, start_address, data)) => {
