@@ -1,3 +1,5 @@
+use core::ops::Range;
+
 use std::num::Wrapping;
 use std::ops::{Index, IndexMut};
 use std::path::PathBuf;
@@ -27,6 +29,7 @@ pub struct Record {
     pub checksum: u8,
 }
 
+#[derive(Debug)]
 // TODO: Implement slicing to get data at address (or something)
 pub struct SRecordFile {
     pub file_path: Option<PathBuf>,
@@ -131,6 +134,18 @@ impl SRecordFile {
         }
         self.data = new_data;
     }
+
+    fn get_vec_containing_address(&self, address: u32) -> Option<(usize, u32, &Vec<u8>)> {
+        let address = address as u64;
+        for (i, (start_address, vec)) in self.data.iter().enumerate() {
+            let start_address = *start_address as u64;
+            let end_address = start_address + vec.len() as u64;
+            if start_address <= address && address < end_address {
+                return Some((i, start_address as u32, vec));
+            }
+        }
+        None
+    }
 }
 
 impl Index<u32> for SRecordFile {
@@ -144,7 +159,14 @@ impl Index<u32> for SRecordFile {
     /// ```
     /// use srex::srecord::SRecordFile;
     ///
-    /// let srecord_file: SRecordFile;
+    /// let srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S104123401B4",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
     ///
     /// // This will panic if 0x1234 does not exist in srecord_file
     /// let value: u8 = srecord_file[0x1234];
@@ -155,15 +177,69 @@ impl Index<u32> for SRecordFile {
     ///
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the SRecord file.
     fn index(&self, address: u32) -> &Self::Output {
-        let address = address as u64;
-        for (start_address, data) in &self.data {
-            let start_address = *start_address as u64;
-            let end_address = start_address + data.len() as u64;
-            if (start_address <= address) && (address < end_address) {
-                return &data[(address - start_address) as usize];
+        match self.get_vec_containing_address(address) {
+            Some((_, start_address, vec)) => {
+                &vec[(address - start_address) as usize]
+            }
+            None => {
+                panic!("Address {address:#04X} does not exist in SRecordFile");
             }
         }
-        panic!("Address {address:#02X} does not exist in SRecordFile");
+    }
+}
+
+impl Index<Range<u32>> for SRecordFile
+{
+    type Output = [u8];
+
+    /// Get a slice for the data inside the [`SRecordFile`] using the syntax
+    /// `srecord_file[0x1235..0x1237]`, where `0x1235` and `0x1237` are addresses inside the SRecord
+    /// file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S107123401020304A8",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// // This will panic if 0x1235..0x1237 does not exist in srecord_file
+    /// let slice: &[u8] = &srecord_file[0x1235..0x1237];
+    /// let x: u8 = slice[0];
+    /// let y: u8 = slice[1];
+    /// println!("x = {x}, y = {y}");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the SRecord file.
+    fn index(&self, address_range: Range<u32>) -> &Self::Output {
+        match self.get_vec_containing_address(address_range.start) {
+            Some((_, start_address, data)) => {
+                let start_index = address_range.start as u64 - start_address as u64;
+                let end_index = address_range.end as u64 - start_address as u64;
+                match data.get(start_index as usize .. end_index as usize) {
+                    Some(slice) => slice,
+                    None => {
+                        let start_address = address_range.start;
+                        let end_address = address_range.end;
+                        panic!("Address range {start_address}..{end_address} is not fully contained in SRecordFile");
+                    }
+                }
+            }
+            None => {
+                let start_address = address_range.start;
+                let end_address = address_range.end;
+                panic!("Address range {start_address}..{end_address} does not exist in SRecordFile");
+            }
+        }
     }
 }
 

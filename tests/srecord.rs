@@ -322,6 +322,42 @@ fn test_srecord_file_index() {
     assert_eq!(srecord_file[0x00], 0x7C);
     assert_eq!(srecord_file[0x01], 0x08);
     assert_eq!(srecord_file[0x3F], 0x6F);
+
+    assert_eq!(srecord_file[0x00..0x01], [0x7C]);
+    assert_eq!(srecord_file[0x00..0x02], [0x7C, 0x08]);
+    assert_eq!(srecord_file[0x43..0x46], [0x2E, 0x0A, 0x00]);
+}
+
+#[test]
+#[should_panic]
+fn test_srecord_file_index_error_1() {
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+
+    let x = srecord_file[0xFF];
+    println!("This should not be printed: {x:#02X}");
+}
+
+#[test]
+#[should_panic]
+fn test_srecord_file_index_error_2() {
+    let srecord_str = fs::read_to_string("tests/srec_files/offset_data.s19").unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+
+    let x = &srecord_file[0x00..0x2F];
+    let x0 = x[0];
+    println!("This should not be printed: {x0:#02X}");
+}
+
+#[test]
+#[should_panic]
+fn test_srecord_file_index_error_3() {
+    let srecord_str = fs::read_to_string("tests/srec_files/offset_data.s19").unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+
+    let x = &srecord_file[0x20..0x5F];
+    let x0 = x[0];
+    println!("This should not be printed: {x0:#02X}");
 }
 
 #[test]
@@ -332,16 +368,6 @@ fn test_srecord_file_index_mut() {
     assert_eq!(srecord_file[0x00], 0x7C);
     srecord_file[0x00] = 0xFF;
     assert_eq!(srecord_file[0x00], 0xFF);
-}
-
-#[test]
-#[should_panic]
-fn test_srecord_file_index_error() {
-    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s19").unwrap();
-    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
-
-    let x = srecord_file[0xFF];
-    println!("This should not be printed: {x:#02X}");
 }
 
 #[test]
