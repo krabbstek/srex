@@ -178,7 +178,8 @@ impl Index<u32> for SRecordFile {
     ///
     /// # Panics
     ///
-    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the SRecord file.
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
+    /// [`SRecordFile`].
     fn index(&self, address: u32) -> &Self::Output {
         match self.get_vec_containing_address(address) {
             Some((_, start_address, vec)) => &vec[(address - start_address) as usize],
@@ -220,7 +221,7 @@ impl Index<Range<u32>> for SRecordFile {
     /// # Panics
     ///
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
-    /// the SRecord file.
+    /// the [`SRecordFile`].
     fn index(&self, address_range: Range<u32>) -> &Self::Output {
         match self.get_vec_containing_address(address_range.start) {
             Some((_, start_address, data)) => {
@@ -247,7 +248,34 @@ impl Index<Range<u32>> for SRecordFile {
 }
 
 impl IndexMut<u32> for SRecordFile {
-    /// Performs mutable indexing in [`SRecordFile`].
+    /// Performs mutable indexing in [`SRecordFile`], allowing writing using syntax
+    /// `srecord_file[0x1234] = 0xFF`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let mut srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S107123401020304A8",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(srecord_file[0x1234], 0x01);
+    /// srecord_file[0x1234] = 0xFF;
+    /// assert_eq!(srecord_file[0x1234], 0xFF);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
+    /// the [`SRecordFile`].
+    ///
+    /// TODO: Implement allocating data if address does not already exist in file.
     fn index_mut(&mut self, address: u32) -> &mut Self::Output {
         let address = address as u64;
         for (start_address, data) in self.data.iter_mut() {
