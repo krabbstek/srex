@@ -21,11 +21,7 @@ fn main() {
     println!("{:?}", args.cmd);
 
     match args.cmd {
-        Commands::Create => {
-
-        },
-        Commands::Merge { output: _ } => {
-
-        },
+        Commands::Create => {}
+        Commands::Merge { output: _ } => {}
     }
 }

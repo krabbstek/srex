@@ -1,0 +1,37 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks: []
+  - repo: local
+    hooks:
+      - id: cargo-check
+        name: cargo check
+        description: Quick check for errors
+        entry: cargo check
+        language: rust
+        pass_filenames: false
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Format with cargo fmt
+        entry: cargo fmt --
+        language: rust
+        types:
+          - rust
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Linting with clippy
+        entry: cargo clippy
+        language: rust
+        pass_filenames: false
+      - id: cargo-doc
+        name: cargo doc
+        description: Generate documentation
+        entry: cargo doc
+        language: rust
+        pass_filenames: false
+      - id: cargo-test
+        name: cargo test
+        description: Run tests
+        entry: cargo test
+        language: rust
+        pass_filenames: false
