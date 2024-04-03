@@ -44,6 +44,51 @@ impl Default for SRecordFile {
 #[derive(Debug, PartialEq, Eq)]
 pub struct SRecordParseError(String);
 
+impl SRecordFile {
+    /// Creates a new [`SRecordFile`] object with empty `header_data`, `data` and `None`
+    /// `start_address`.
+    pub fn new() -> Self {
+        SRecordFile {
+            header_data: Vec::<u8>::new(),
+            data: Vec::<(u32, Vec<u8>)>::new(),
+            start_address: None,
+        }
+    }
+
+    /// Sorts data address ascending, and merges adjacent data together
+    pub fn sort_data(&mut self) {
+        self.data.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut new_data = Vec::<(u32, Vec<u8>)>::new();
+        for (address, vec) in self.data.iter() {
+            match new_data.last_mut() {
+                Some(c) => {
+                    if *address as u64 == c.0 as u64 + c.1.len() as u64 {
+                        c.1.extend(vec);
+                    } else {
+                        new_data.push((*address, vec.to_vec()));
+                    }
+                }
+                None => {
+                    new_data.push((*address, vec.to_vec()));
+                }
+            }
+        }
+        self.data = new_data;
+    }
+
+    fn get_vec_containing_address(&self, address: u32) -> Option<(usize, u32, &Vec<u8>)> {
+        let address = address as u64;
+        for (i, (start_address, vec)) in self.data.iter().enumerate() {
+            let start_address = *start_address as u64;
+            let end_address = start_address + vec.len() as u64;
+            if start_address <= address && address < end_address {
+                return Some((i, start_address as u32, vec));
+            }
+        }
+        None
+    }
+}
+
 impl FromStr for SRecordFile {
     type Err = SRecordParseError;
 
@@ -105,49 +150,6 @@ impl FromStr for SRecordFile {
         srecord_file.sort_data();
 
         Ok(srecord_file)
-    }
-}
-
-impl SRecordFile {
-    pub fn new() -> Self {
-        SRecordFile {
-            header_data: Vec::<u8>::new(),
-            data: Vec::<(u32, Vec<u8>)>::new(),
-            start_address: None,
-        }
-    }
-
-    /// Sorts data address ascending, and merges adjacent data together
-    pub fn sort_data(&mut self) {
-        self.data.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut new_data = Vec::<(u32, Vec<u8>)>::new();
-        for (address, vec) in self.data.iter() {
-            match new_data.last_mut() {
-                Some(c) => {
-                    if *address as u64 == c.0 as u64 + c.1.len() as u64 {
-                        c.1.extend(vec);
-                    } else {
-                        new_data.push((*address, vec.to_vec()));
-                    }
-                }
-                None => {
-                    new_data.push((*address, vec.to_vec()));
-                }
-            }
-        }
-        self.data = new_data;
-    }
-
-    fn get_vec_containing_address(&self, address: u32) -> Option<(usize, u32, &Vec<u8>)> {
-        let address = address as u64;
-        for (i, (start_address, vec)) in self.data.iter().enumerate() {
-            let start_address = *start_address as u64;
-            let end_address = start_address + vec.len() as u64;
-            if start_address <= address && address < end_address {
-                return Some((i, start_address as u32, vec));
-            }
-        }
-        None
     }
 }
 
