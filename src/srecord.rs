@@ -30,8 +30,11 @@ pub struct Record {
 
 #[derive(Debug)]
 pub struct SRecordFile {
+    /// Byte vector with data in header (S0).
     pub header_data: Vec<u8>,
+    /// Byte vector with actual file data (S1/S2/S3).
     pub data: Vec<(u32, Vec<u8>)>,
+    /// Start address at the end of the file.
     pub start_address: Option<u32>,
 }
 
