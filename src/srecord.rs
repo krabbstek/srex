@@ -413,7 +413,6 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
     }
 
     // Next, parse data
-    println!("{record_str}");
     let data_start_index = 4 + num_address_chars;
     let data_end_index = data_start_index + 2 * (byte_count as usize) - 2 * (num_address_bytes + 1);
     let data: Vec<u8>;
