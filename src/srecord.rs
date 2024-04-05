@@ -294,6 +294,37 @@ impl IndexMut<u32> for SRecordFile {
     }
 }
 
+/// Parses a record type from `record_type_str` and returns it, or error message
+fn parse_record_type(record_type_str: &str) -> Result<RecordType, SRecordParseError> {
+    let mut chars = record_type_str.chars();
+    match chars.next() {
+        Some('S') => match chars.next() {
+            Some('0') => Ok(RecordType::S0),
+            Some('1') => Ok(RecordType::S1),
+            Some('2') => Ok(RecordType::S2),
+            Some('3') => Ok(RecordType::S3),
+            Some('4') => Err(SRecordParseError(String::from(
+                "invalid record type S4 (reserved)",
+            ))),
+            Some('5') => Ok(RecordType::S5),
+            Some('6') => Ok(RecordType::S6),
+            Some('7') => Ok(RecordType::S7),
+            Some('8') => Ok(RecordType::S8),
+            Some('9') => Ok(RecordType::S9),
+            Some(c) => Err(SRecordParseError(format!("invalid record type S{c}"))),
+            None => Err(SRecordParseError(String::from(
+                "no record type encountered (early end of str)",
+            ))),
+        },
+        Some(c) => Err(SRecordParseError(format!(
+            "expected first character of record to be 'S' but was '{c}'"
+        ))),
+        None => Err(SRecordParseError(String::from(
+            "empty string encountered when trying to parse record type",
+        ))),
+    }
+}
+
 /// Calculate the checksum for a single record (line).
 ///
 /// The checksum is calculated from the sum of all the individual bytes, from `byte_count`,
@@ -323,46 +354,10 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
 
 /// Parse a record (single line) from an SRecord file.
 pub fn parse_record(record_str: &str) -> Result<Record, String> {
-    // First char is supposed to be an S
-    match record_str.chars().next() {
-        Some('S') => {}
-        Some(other_char) => {
-            return Err(format!("Failed to parse '{record_str}': expected first character in record to be 'S' but was {other_char}"));
-        }
-        None => {
-            return Err(String::from("Empty string slice passed into parse_record"));
-        }
-    }
-
-    // Next, parse record type
-    let record_type_char = match record_str.chars().nth(1) {
-        Some(c) => c,
-        None => {
-            return Err(format!(
-                "Failed to parse '{record_str}': unexpected end of string when parsing record type"
-            ));
-        }
-    };
-    let record_type = match record_type_char {
-        '0' => RecordType::S0,
-        '1' => RecordType::S1,
-        '2' => RecordType::S2,
-        '3' => RecordType::S3,
-        '4' => {
-            return Err(format!(
-                "Failed to parse '{record_str}': record type S4 is reserved"
-            ));
-        }
-        '5' => RecordType::S5,
-        '6' => RecordType::S6,
-        '7' => RecordType::S7,
-        '8' => RecordType::S8,
-        '9' => RecordType::S9,
-        c => {
-            return Err(format!(
-                "Failed to parse '{record_str}': invalid record type S{c}"
-            ));
-        }
+    // TODO: Return SRecordParseError and use ? operator
+    let record_type = match parse_record_type(record_str) {
+        Ok(t) => t,
+        Err(msg) => return Err(msg.0),
     };
 
     // Next, parse byte-count
