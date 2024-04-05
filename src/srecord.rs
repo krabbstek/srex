@@ -45,7 +45,54 @@ impl Default for SRecordFile {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct SRecordParseError(String);
+pub struct SRecordParseError {
+    pub error_type: ErrorType,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ErrorType {
+    /// Early, unexpected end of line when parsing record type (S*)
+    EolWhileParsingRecordType,
+    /// Early, unexpected end of line when parsing byte count
+    EolWhileParsingByteCount,
+    /// Early, unexpected end of line when parsing address
+    EolWhileParsingAddress,
+    /// Early, unexpected end of line when parsing data
+    EolWhileParsingData,
+    /// Early, unexpected end of line when parsing checksum
+    EolWhileParsingChecksum,
+
+    /// Line not terminated after checksum is parsed (supposed to be final byte of line
+    LineNotTerminatedAfterChecksum,
+
+    /// First character in record/line is not 'S'
+    InvalidFirstCharacter,
+    /// S4 record is reserved
+    S4Reserved,
+    /// Invalid character after 'S', e.g. 'SA'
+    InvalidRecordType,
+
+    /// Invalid byte count (e.g. invalid characters)
+    InvalidByteCount,
+
+    /// Invalid address (e.g. invalid characters)
+    InvalidAddress,
+
+    /// Invalid data (e.g. invalid characters)
+    InvalidData,
+
+    /// Invalid checksum (e.g. invalid characters)
+    InvalidChecksum,
+    /// Calculated checksum from byte count, address and data does not match checksum parsed from
+    /// file
+    CalculatedChecksumNotMatchingParsedChecksum,
+
+    /// Calculated/encountered number of records do not match what is configured in file
+    CalculatedNumRecordsNotMatchingParsedNumRecords,
+
+    /// Multiple start addresses (S7|8|9) found
+    MultipleStartAddresses,
+}
 
 impl SRecordFile {
     /// Creates a new [`SRecordFile`] object with empty `header_data`, `data` and `None`
@@ -131,21 +178,24 @@ impl FromStr for SRecordFile {
                             // * Ensure it matches number of encountered data records
                             let file_num_records = record.address;
                             if num_data_records != file_num_records {
-                                return Err(SRecordParseError(format!("Failed to parse SRecord: Number of records found in file ({num_data_records:#02X}) does not match record count in file ({line} - {file_num_records:#02X}")));
+                                return Err(SRecordParseError {
+                                    error_type:
+                                        ErrorType::CalculatedNumRecordsNotMatchingParsedNumRecords,
+                                });
                             }
                         }
                         RecordType::S7 | RecordType::S8 | RecordType::S9 => {
                             if srecord_file.start_address.is_some() {
-                                return Err(SRecordParseError(String::from(
-                                    "Failed to parse SRecord: multiple start address records found",
-                                )));
+                                return Err(SRecordParseError {
+                                    error_type: ErrorType::MultipleStartAddresses,
+                                });
                             }
                             srecord_file.start_address = Some(record.address);
                         }
                     }
                 }
-                Err(msg) => {
-                    return Err(SRecordParseError(msg));
+                Err(err) => {
+                    return Err(err);
                 }
             }
         }
@@ -304,25 +354,27 @@ fn parse_record_type(record_type_str: &str) -> Result<RecordType, SRecordParseEr
             Some('1') => Ok(RecordType::S1),
             Some('2') => Ok(RecordType::S2),
             Some('3') => Ok(RecordType::S3),
-            Some('4') => Err(SRecordParseError(String::from(
-                "invalid record type S4 (reserved)",
-            ))),
+            Some('4') => Err(SRecordParseError {
+                error_type: ErrorType::S4Reserved,
+            }),
             Some('5') => Ok(RecordType::S5),
             Some('6') => Ok(RecordType::S6),
             Some('7') => Ok(RecordType::S7),
             Some('8') => Ok(RecordType::S8),
             Some('9') => Ok(RecordType::S9),
-            Some(c) => Err(SRecordParseError(format!("invalid record type S{c}"))),
-            None => Err(SRecordParseError(String::from(
-                "no record type encountered (early end of str)",
-            ))),
+            Some(_) => Err(SRecordParseError {
+                error_type: ErrorType::InvalidRecordType,
+            }),
+            None => Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingRecordType,
+            }),
         },
-        Some(c) => Err(SRecordParseError(format!(
-            "expected first character of record to be 'S' but was '{c}'"
-        ))),
-        None => Err(SRecordParseError(String::from(
-            "empty string encountered when trying to parse record type",
-        ))),
+        Some(_) => Err(SRecordParseError {
+            error_type: ErrorType::InvalidFirstCharacter,
+        }),
+        None => Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingRecordType,
+        }),
     }
 }
 
@@ -354,25 +406,25 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
 }
 
 /// Parse a record (single line) from an SRecord file.
-pub fn parse_record(record_str: &str) -> Result<Record, String> {
-    // TODO: Return SRecordParseError and use ? operator
-    let record_type = match parse_record_type(record_str) {
-        Ok(t) => t,
-        Err(msg) => return Err(msg.0),
-    };
+pub fn parse_record(record_str: &str) -> Result<Record, SRecordParseError> {
+    // First, record type
+    let record_type = parse_record_type(record_str)?;
 
+    // Next, byte count
     let byte_count = match record_str.get(2..4) {
-        Some(byte_count_str) => {
-            match u8::from_str_radix(byte_count_str, 16) {
-                Ok(i) => i,
-                Err(_) => return Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")),
+        Some(byte_count_str) => match u8::from_str_radix(byte_count_str, 16) {
+            Ok(i) => i,
+            Err(_) => {
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidByteCount,
+                })
             }
         },
         None => {
-            return Err(format!(
-                "Failed to parse '{record_str}': unexpected end of string when parsing byte count"
-            ));
-        },
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingByteCount,
+            })
+        }
     };
 
     // Next, parse address
@@ -388,75 +440,71 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         RecordType::S9 => 2,
     };
     let num_address_chars = num_address_bytes * 2;
-    let address: u32;
-    match record_str.get(4..4 + num_address_chars) {
-        None => {
-            return Err(format!(
-                "Failed to parse '{record_str}': unexpected end of string when parsing address"
-            ));
-        }
-        Some(address_str) => {
-            match u32::from_str_radix(address_str, 16) {
-                Ok(i) => {
-                    address = i;
-                }
-                Err(_) => {
-                    return Err(format!("Failed to parse '{record_str}': could not parse address from '{address_str}'"));
-                }
+    let address: u32 = match record_str.get(4..4 + num_address_chars) {
+        Some(address_str) => match u32::from_str_radix(address_str, 16) {
+            Ok(i) => i,
+            Err(_) => {
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidAddress,
+                })
             }
+        },
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingAddress,
+            })
         }
-    }
+    };
 
     // Next, parse data
     let data_start_index = 4 + num_address_chars;
     let data_end_index = data_start_index + 2 * (byte_count as usize) - 2 * (num_address_bytes + 1);
-    let data: Vec<u8>;
-    match record_str.get(data_start_index..data_end_index) {
-        None => {
-            return Err(format!(
-                "Failed to parse '{record_str}': unexpected end of string when parsing data"
-            ));
-        }
+    let data = match record_str.get(data_start_index..data_end_index) {
         Some(data_str) => match hex::decode(data_str) {
-            Ok(vec) => {
-                data = vec;
-            }
+            Ok(vec) => vec,
             Err(_) => {
-                return Err(format!(
-                    "Failed to parse '{record_str}': could not parse data from '{data_str}'"
-                ));
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidData,
+                });
             }
         },
-    }
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingData,
+            });
+        }
+    };
 
     // Next, parse and validate checksum
     let checksum_start_index = data_end_index;
     let checksum_end_index = checksum_start_index + 2;
-    let checksum: u8;
-    match record_str.get(checksum_start_index..checksum_end_index) {
-        None => {
-            return Err(format!(
-                "Failed to parse '{record_str}': unexpected end of string when parsing checksum"
-            ));
-        }
+    let checksum: u8 = match record_str.get(checksum_start_index..checksum_end_index) {
         Some(checksum_str) => match u8::from_str_radix(checksum_str, 16) {
-            Ok(i) => {
-                checksum = i;
-            }
+            Ok(i) => i,
             Err(_) => {
-                return Err(format!("Failed to parse '{record_str}': could not parse checksum from '{checksum_str}'"));
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidChecksum,
+                });
             }
         },
-    }
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingChecksum,
+            });
+        }
+    };
     let expected_checksum = calculate_checksum(byte_count, address, &data);
     if checksum != expected_checksum {
-        return Err(format!("Failed to parse '{record_str}': calculated checksum {expected_checksum:#02X} does not match parsed checksum {checksum:#02X}"));
+        return Err(SRecordParseError {
+            error_type: ErrorType::CalculatedChecksumNotMatchingParsedChecksum,
+        });
     }
 
     // Finally, validate that we are at the end of the record str
     if record_str.len() != checksum_end_index {
-        let remaining_str = &record_str[checksum_end_index..];
-        return Err(format!("Failed to parse '{record_str}': expected {checksum_end_index} characters but the string slice continued with '{remaining_str}'"));
+        return Err(SRecordParseError {
+            error_type: ErrorType::LineNotTerminatedAfterChecksum,
+        });
     }
 
     Ok(Record {
