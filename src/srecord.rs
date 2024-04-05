@@ -20,6 +20,7 @@ pub enum RecordType {
     S9, // 16-bit start address
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Record {
     pub record_type: RecordType,
     pub byte_count: u8,

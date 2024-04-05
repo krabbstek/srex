@@ -191,42 +191,122 @@ fn test_parse_record() {
     // TODO: Compare to error types
 
     // Empty string
-    assert!(parse_record("").is_err());
-    // Invalid first characters
-    assert!(parse_record("0").is_err());
+    assert_eq!(
+        parse_record(""),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingRecordType
+        })
+    );
+    // Invalid first character
+    assert_eq!(
+        parse_record("0"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidFirstCharacter
+        })
+    );
 
     // No record type
-    assert!(parse_record("S").is_err());
+    assert_eq!(
+        parse_record("S"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingRecordType
+        })
+    );
     // Invalid record type
-    assert!(parse_record("SA").is_err());
-    assert!(parse_record("S4").is_err());
+    assert_eq!(
+        parse_record("SA"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidRecordType
+        })
+    );
+    assert_eq!(
+        parse_record("S4"),
+        Err(SRecordParseError {
+            error_type: ErrorType::S4Reserved
+        })
+    );
 
     // No byte count
-    assert!(parse_record("S1").is_err());
+    assert_eq!(
+        parse_record("S1"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingByteCount
+        })
+    );
     // Invalid byte count
-    assert!(parse_record("S1FG").is_err());
+    assert_eq!(
+        parse_record("S1FG"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidByteCount
+        })
+    );
 
     // No address
-    assert!(parse_record("S107").is_err());
-    // Invalid byte count
-    assert!(parse_record("S107xxxx").is_err());
+    assert_eq!(
+        parse_record("S107"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingAddress
+        })
+    );
+    // Invalid address
+    assert_eq!(
+        parse_record("S107xxxx"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidAddress
+        })
+    );
 
     // No data
-    assert!(parse_record("S1070000").is_err());
+    assert_eq!(
+        parse_record("S1070000"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingData
+        })
+    );
     // Too short data
-    assert!(parse_record("S10700001234").is_err());
+    assert_eq!(
+        parse_record("S10700001234"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingData
+        })
+    );
     // Invalid data
-    assert!(parse_record("S1070000xxxxxxxx").is_err());
+    assert_eq!(
+        parse_record("S1070000xxxxxxxx"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidData
+        })
+    );
 
     // No checksum
-    assert!(parse_record("S107000001020304").is_err());
+    assert_eq!(
+        parse_record("S107000001020304"),
+        Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingChecksum
+        })
+    );
     // Invalid checksum
-    assert!(parse_record("S107000001020304xx").is_err());
+    assert_eq!(
+        parse_record("S107000001020304xx"),
+        Err(SRecordParseError {
+            error_type: ErrorType::InvalidChecksum
+        })
+    );
     // Incorrect checksum
-    assert!(parse_record("S10700000102030400").is_err());
+    assert_eq!(
+        parse_record("S10700000102030400"),
+        Err(SRecordParseError {
+            error_type: ErrorType::CalculatedChecksumNotMatchingParsedChecksum
+        })
+    );
 
     // Too long string
-    assert!(parse_record("S107000001020304EE0").is_err());
+    assert_eq!(
+        parse_record("S107000001020304EE0"),
+        Err(SRecordParseError {
+            error_type: ErrorType::LineNotTerminatedAfterChecksum
+        })
+    );
 }
 
 #[test]
