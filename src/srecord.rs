@@ -295,6 +295,7 @@ impl IndexMut<u32> for SRecordFile {
 }
 
 /// Parses a record type from `record_type_str` and returns it, or error message
+#[inline]
 fn parse_record_type(record_type_str: &str) -> Result<RecordType, SRecordParseError> {
     let mut chars = record_type_str.chars();
     match chars.next() {
@@ -360,23 +361,19 @@ pub fn parse_record(record_str: &str) -> Result<Record, String> {
         Err(msg) => return Err(msg.0),
     };
 
-    // Next, parse byte-count
-    let byte_count: u8;
-    match record_str.get(2..4) {
+    let byte_count = match record_str.get(2..4) {
+        Some(byte_count_str) => {
+            match u8::from_str_radix(byte_count_str, 16) {
+                Ok(i) => i,
+                Err(_) => return Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'")),
+            }
+        },
         None => {
             return Err(format!(
                 "Failed to parse '{record_str}': unexpected end of string when parsing byte count"
             ));
-        }
-        Some(byte_count_str) => match u8::from_str_radix(byte_count_str, 16) {
-            Ok(i) => {
-                byte_count = i;
-            }
-            Err(_) => {
-                return Err(format!("Failed to parse '{record_str}': could not parse byte count from '{byte_count_str}'"));
-            }
         },
-    }
+    };
 
     // Next, parse address
     let num_address_bytes = match record_type {
