@@ -1,12 +1,13 @@
 use core::ops::Range;
 
+use std::fmt;
 use std::num::Wrapping;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
 use hex;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordType {
     S0, // Header
     S1, // 16-bit address data
@@ -20,19 +21,50 @@ pub enum RecordType {
     S9, // 16-bit start address
 }
 
+impl RecordType {
+    fn num_address_bytes(&self) -> usize {
+        match *self {
+            RecordType::S0 => 2,
+            RecordType::S1 => 2,
+            RecordType::S2 => 3,
+            RecordType::S3 => 4,
+            RecordType::S5 => 2,
+            RecordType::S6 => 3,
+            RecordType::S7 => 4,
+            RecordType::S8 => 3,
+            RecordType::S9 => 2,
+        }
+    }
+}
+
+impl fmt::Display for RecordType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RecordType::S0 => write!(f, "S0"),
+            RecordType::S1 => write!(f, "S1"),
+            RecordType::S2 => write!(f, "S2"),
+            RecordType::S3 => write!(f, "S3"),
+            RecordType::S5 => write!(f, "S5"),
+            RecordType::S6 => write!(f, "S6"),
+            RecordType::S7 => write!(f, "S7"),
+            RecordType::S8 => write!(f, "S8"),
+            RecordType::S9 => write!(f, "S9"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Record {
     pub record_type: RecordType,
     pub byte_count: u8,
     pub address: u32,
-    pub data: Vec<u8>, // TODO: array slice?
-    pub checksum: u8,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug)]
 pub struct SRecordFile {
     /// Byte vector with data in header (S0).
-    pub header_data: Vec<u8>,
+    pub header_data: Option<Vec<u8>>,
     /// Byte vector with actual file data (S1/S2/S3).
     pub data: Vec<(u32, Vec<u8>)>,
     /// Start address at the end of the file.
@@ -75,12 +107,16 @@ pub enum ErrorType {
 
     /// Invalid byte count (e.g. invalid characters)
     InvalidByteCount,
+    /// Byte count is too low for the minimum amount of bytes for record type
+    ByteCountTooLowForRecordType,
 
     /// Invalid address (e.g. invalid characters)
     InvalidAddress,
 
     /// Invalid data (e.g. invalid characters)
     InvalidData,
+    /// Overlapping data (data for same address encountered multiple times
+    OverlappingData,
 
     /// Invalid checksum (e.g. invalid characters)
     InvalidChecksum,
@@ -91,16 +127,18 @@ pub enum ErrorType {
     /// Calculated/encountered number of records do not match what is configured in file
     CalculatedNumRecordsNotMatchingParsedNumRecords,
 
+    /// Multiple header records (S0) found
+    MultipleHeaderRecords,
     /// Multiple start addresses (S7|8|9) found
     MultipleStartAddresses,
 }
 
 impl SRecordFile {
-    /// Creates a new [`SRecordFile`] object with empty `header_data`, `data` and `None`
-    /// `start_address`.
+    /// Creates a new [`SRecordFile`] object with empty `data` and `None`
+    /// `header_data` and `start_address`.
     pub fn new() -> Self {
         SRecordFile {
-            header_data: Vec::<u8>::new(),
+            header_data: None,
             data: Vec::<(u32, Vec<u8>)>::new(),
             start_address: None,
         }
@@ -153,7 +191,8 @@ impl FromStr for SRecordFile {
                 Ok(record) => {
                     match record.record_type {
                         RecordType::S0 => {
-                            srecord_file.header_data.extend(&record.data);
+                            // TODO: Error if multiple header records instead of overwriting
+                            srecord_file.header_data = Some(record.data);
                         }
                         RecordType::S1 | RecordType::S2 | RecordType::S3 => {
                             // TODO: Validate record type (no mixes?)
@@ -345,10 +384,10 @@ impl IndexMut<u32> for SRecordFile {
     }
 }
 
-/// Parses a record type from `record_type_str` and returns it, or error message
+/// Parses a record type from `record_str` and returns it, or error message
 #[inline]
-fn parse_record_type(record_type_str: &str) -> Result<RecordType, SRecordParseError> {
-    let mut chars = record_type_str.chars();
+fn parse_record_type(record_str: &str) -> Result<RecordType, SRecordParseError> {
+    let mut chars = record_str.chars();
     match chars.next() {
         Some('S') => match chars.next() {
             Some('0') => Ok(RecordType::S0),
@@ -377,6 +416,121 @@ fn parse_record_type(record_type_str: &str) -> Result<RecordType, SRecordParseEr
             error_type: ErrorType::EolWhileParsingRecordType,
         }),
     }
+}
+
+/// Parses byte count from `record_str` and returns it, or error message
+#[inline]
+fn parse_byte_count(record_str: &str) -> Result<u8, SRecordParseError> {
+    match record_str.get(2..4) {
+        Some(byte_count_str) => match u8::from_str_radix(byte_count_str, 16) {
+            Ok(i) => Ok(i),
+            Err(_) => Err(SRecordParseError {
+                error_type: ErrorType::InvalidByteCount,
+            }),
+        },
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingByteCount,
+            })
+        }
+    }
+}
+
+/// Parses address from `record_str` and returns it, or error message
+#[inline]
+fn parse_address(record_str: &str, record_type: RecordType) -> Result<u32, SRecordParseError> {
+    let num_address_bytes = record_type.num_address_bytes();
+    let num_address_chars = num_address_bytes * 2;
+    let address_start_index = 4;
+    let address_end_index = address_start_index + num_address_chars;
+
+    match record_str.get(address_start_index..address_end_index) {
+        Some(address_str) => match u32::from_str_radix(address_str, 16) {
+            Ok(i) => Ok(i),
+            Err(_) => Err(SRecordParseError {
+                error_type: ErrorType::InvalidAddress,
+            }),
+        },
+        None => Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingAddress,
+        }),
+    }
+}
+
+/// Parses data and sets slice inside record
+///
+/// Data is added to `self` and a slice to the data is set to `record`
+#[inline]
+fn parse_data_and_checksum(
+    record_str: &str,
+    record_type: RecordType,
+    byte_count: u8,
+    address: u32,
+) -> Result<Vec<u8>, SRecordParseError> {
+    // TODO: Validate record type?
+
+    let num_address_bytes = record_type.num_address_bytes();
+    let num_data_bytes = match (byte_count as usize).checked_sub(num_address_bytes + 1) {
+        Some(i) => i,
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::ByteCountTooLowForRecordType,
+            })
+        }
+    };
+
+    // Parse data
+    let data_start_index = 2 + 2 + 2 * num_address_bytes; // S* + byte count + address
+    let data_end_index = data_start_index + num_data_bytes * 2;
+    let record_data = match record_str.get(data_start_index..data_end_index) {
+        Some(data_str) => match hex::decode(data_str) {
+            Ok(vec) => vec,
+            Err(_) => {
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidData,
+                })
+            }
+        },
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingData,
+            })
+        }
+    };
+
+    // Next, parse and validate checksum
+    let checksum_start_index = data_end_index;
+    let checksum_end_index = checksum_start_index + 2;
+    let checksum: u8 = match record_str.get(checksum_start_index..checksum_end_index) {
+        Some(checksum_str) => match u8::from_str_radix(checksum_str, 16) {
+            Ok(i) => i,
+            Err(_) => {
+                return Err(SRecordParseError {
+                    error_type: ErrorType::InvalidChecksum,
+                });
+            }
+        },
+        None => {
+            return Err(SRecordParseError {
+                error_type: ErrorType::EolWhileParsingChecksum,
+            });
+        }
+    };
+    let expected_checksum = calculate_checksum(byte_count, address, record_data.as_slice());
+    if checksum != expected_checksum {
+        return Err(SRecordParseError {
+            error_type: ErrorType::CalculatedChecksumNotMatchingParsedChecksum,
+        });
+    }
+
+    // Finally, validate that we are at the end of the record str
+    if record_str.len() != checksum_end_index {
+        return Err(SRecordParseError {
+            error_type: ErrorType::LineNotTerminatedAfterChecksum,
+        });
+    }
+
+    Ok(record_data)
 }
 
 /// Calculate the checksum for a single record (line).
@@ -408,111 +562,14 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
 
 /// Parse a record (single line) from an SRecord file.
 pub fn parse_record(record_str: &str) -> Result<Record, SRecordParseError> {
-    // First, record type
     let record_type = parse_record_type(record_str)?;
-
-    // Next, byte count
-    let byte_count = match record_str.get(2..4) {
-        Some(byte_count_str) => match u8::from_str_radix(byte_count_str, 16) {
-            Ok(i) => i,
-            Err(_) => {
-                return Err(SRecordParseError {
-                    error_type: ErrorType::InvalidByteCount,
-                })
-            }
-        },
-        None => {
-            return Err(SRecordParseError {
-                error_type: ErrorType::EolWhileParsingByteCount,
-            })
-        }
-    };
-
-    // Next, parse address
-    let num_address_bytes = match record_type {
-        RecordType::S0 => 2,
-        RecordType::S1 => 2,
-        RecordType::S2 => 3,
-        RecordType::S3 => 4,
-        RecordType::S5 => 2,
-        RecordType::S6 => 3,
-        RecordType::S7 => 4,
-        RecordType::S8 => 3,
-        RecordType::S9 => 2,
-    };
-    let num_address_chars = num_address_bytes * 2;
-    let address: u32 = match record_str.get(4..4 + num_address_chars) {
-        Some(address_str) => match u32::from_str_radix(address_str, 16) {
-            Ok(i) => i,
-            Err(_) => {
-                return Err(SRecordParseError {
-                    error_type: ErrorType::InvalidAddress,
-                })
-            }
-        },
-        None => {
-            return Err(SRecordParseError {
-                error_type: ErrorType::EolWhileParsingAddress,
-            })
-        }
-    };
-
-    // Next, parse data
-    let data_start_index = 4 + num_address_chars;
-    let data_end_index = data_start_index + 2 * (byte_count as usize) - 2 * (num_address_bytes + 1);
-    let data = match record_str.get(data_start_index..data_end_index) {
-        Some(data_str) => match hex::decode(data_str) {
-            Ok(vec) => vec,
-            Err(_) => {
-                return Err(SRecordParseError {
-                    error_type: ErrorType::InvalidData,
-                });
-            }
-        },
-        None => {
-            return Err(SRecordParseError {
-                error_type: ErrorType::EolWhileParsingData,
-            });
-        }
-    };
-
-    // Next, parse and validate checksum
-    let checksum_start_index = data_end_index;
-    let checksum_end_index = checksum_start_index + 2;
-    let checksum: u8 = match record_str.get(checksum_start_index..checksum_end_index) {
-        Some(checksum_str) => match u8::from_str_radix(checksum_str, 16) {
-            Ok(i) => i,
-            Err(_) => {
-                return Err(SRecordParseError {
-                    error_type: ErrorType::InvalidChecksum,
-                });
-            }
-        },
-        None => {
-            return Err(SRecordParseError {
-                error_type: ErrorType::EolWhileParsingChecksum,
-            });
-        }
-    };
-    let expected_checksum = calculate_checksum(byte_count, address, &data);
-    if checksum != expected_checksum {
-        return Err(SRecordParseError {
-            error_type: ErrorType::CalculatedChecksumNotMatchingParsedChecksum,
-        });
-    }
-
-    // Finally, validate that we are at the end of the record str
-    if record_str.len() != checksum_end_index {
-        return Err(SRecordParseError {
-            error_type: ErrorType::LineNotTerminatedAfterChecksum,
-        });
-    }
-
+    let byte_count = parse_byte_count(record_str)?;
+    let address = parse_address(record_str, record_type.clone())?;
+    let data = parse_data_and_checksum(record_str, record_type.clone(), byte_count, address)?;
     Ok(Record {
         record_type,
         byte_count,
         address,
         data,
-        checksum,
     })
 }

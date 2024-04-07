@@ -63,63 +63,54 @@ fn test_parse_record() {
     assert_eq!(record.byte_count, 0x07);
     assert_eq!(record.address, 0x0000);
     assert_eq!(record.data, Vec::<u8>::from([0x65, 0x66, 0x67, 0x00]));
-    assert_eq!(record.checksum, 0xC6);
 
     let record = parse_record("S107123401020304A8").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
     assert_eq!(record.byte_count, 0x07);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
-    assert_eq!(record.checksum, 0xA8);
 
     let record = parse_record("S2081234560102030451").unwrap();
     assert_eq!(record.record_type, RecordType::S2);
     assert_eq!(record.byte_count, 0x08);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
-    assert_eq!(record.checksum, 0x51);
 
     let record = parse_record("S3091234567801020304D8").unwrap();
     assert_eq!(record.record_type, RecordType::S3);
     assert_eq!(record.byte_count, 0x09);
     assert_eq!(record.address, 0x12345678);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
-    assert_eq!(record.checksum, 0xD8);
 
     let record = parse_record("S5031234B6").unwrap();
     assert_eq!(record.record_type, RecordType::S5);
     assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0xB6);
 
     let record = parse_record("S6041234565F").unwrap();
     assert_eq!(record.record_type, RecordType::S6);
     assert_eq!(record.byte_count, 0x04);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0x5F);
 
     let record = parse_record("S70512345678E6").unwrap();
     assert_eq!(record.record_type, RecordType::S7);
     assert_eq!(record.byte_count, 0x05);
     assert_eq!(record.address, 0x12345678);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0xE6);
 
     let record = parse_record("S8041234565F").unwrap();
     assert_eq!(record.record_type, RecordType::S8);
     assert_eq!(record.byte_count, 0x04);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0x5F);
 
     let record = parse_record("S9031234B6").unwrap();
     assert_eq!(record.record_type, RecordType::S9);
     assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0xB6);
 
     // Test Wikipedia example
 
@@ -131,7 +122,6 @@ fn test_parse_record() {
         record.data,
         Vec::<u8>::from([0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00])
     );
-    assert_eq!(record.checksum, 0x3C);
 
     let record =
         parse_record("S11F00007C0802A6900100049421FFF07C6C1B787C8C23783C6000003863000026").unwrap();
@@ -145,7 +135,6 @@ fn test_parse_record() {
             0x1B, 0x78, 0x7C, 0x8C, 0x23, 0x78, 0x3C, 0x60, 0x00, 0x00, 0x38, 0x63, 0x00, 0x00
         ])
     );
-    assert_eq!(record.checksum, 0x26);
 
     let record =
         parse_record("S11F001C4BFFFFE5398000007D83637880010014382100107C0803A64E800020E9").unwrap();
@@ -159,7 +148,6 @@ fn test_parse_record() {
             0x00, 0x14, 0x38, 0x21, 0x00, 0x10, 0x7C, 0x08, 0x03, 0xA6, 0x4E, 0x80, 0x00, 0x20
         ])
     );
-    assert_eq!(record.checksum, 0xE9);
 
     let record = parse_record("S111003848656C6C6F20776F726C642E0A0042").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
@@ -171,24 +159,20 @@ fn test_parse_record() {
             0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x77, 0x6F, 0x72, 0x6C, 0x64, 0x2E, 0x0A, 0x00
         ])
     );
-    assert_eq!(record.checksum, 0x42);
 
     let record = parse_record("S5030003F9").unwrap();
     assert_eq!(record.record_type, RecordType::S5);
     assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x0003);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0xF9);
 
     let record = parse_record("S9030000FC").unwrap();
     assert_eq!(record.record_type, RecordType::S9);
     assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x0000);
     assert_eq!(record.data, Vec::<u8>::from([]));
-    assert_eq!(record.checksum, 0xFC);
 
     // Errors
-    // TODO: Compare to error types
 
     // Empty string
     assert_eq!(
@@ -312,7 +296,7 @@ fn test_parse_record() {
 #[test]
 fn test_srecord_file_new() {
     let srecord_file = SRecordFile::new();
-    assert_eq!(srecord_file.header_data, []);
+    assert_eq!(srecord_file.header_data, None);
     assert_eq!(srecord_file.data, []);
     assert_eq!(srecord_file.start_address, None);
 }
@@ -320,7 +304,7 @@ fn test_srecord_file_new() {
 #[test]
 fn test_srecord_file_default() {
     let srecord_file = Option::<SRecordFile>::None.unwrap_or_default();
-    assert_eq!(srecord_file.header_data, []);
+    assert_eq!(srecord_file.header_data, None);
     assert_eq!(srecord_file.data, []);
     assert_eq!(srecord_file.start_address, None);
 }
@@ -331,7 +315,7 @@ fn test_srecord_file_from_str() {
     let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
     assert_eq!(
-        srecord_file.header_data,
+        srecord_file.header_data.unwrap(),
         Vec::<u8>::from([0x68, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00])
     );
     assert_eq!(
@@ -355,7 +339,7 @@ fn test_parse_srecord_unsorted_data() {
     let srecord_str = fs::read_to_string("tests/srec_files/unsorted.s28").unwrap();
     let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
 
-    assert_eq!(srecord_file.header_data, []);
+    assert_eq!(srecord_file.header_data, Some(Vec::<u8>::new()));
     assert_eq!(
         srecord_file.data,
         [
