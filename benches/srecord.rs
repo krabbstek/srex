@@ -18,23 +18,42 @@ fn bench_calculate_checksum(c: &mut Criterion) {
 
 fn bench_from_str(c: &mut Criterion) {
     let mut srecord_str = String::new();
-    let num_rows = 1000000;
-    srecord_str.reserve("S113000000000000000000000000000000000000EC".len() * num_rows);
+    let num_rows: u32 = 1000000;
+    srecord_str.reserve("S315000000000000000000000000000000000000EC\n".len() * num_rows as usize);
     for i in 0..num_rows {
         let address = i * 16;
-        srecord_str
-            .push_str(format!("S113{address:04X}00000000000000000000000000000000EC").as_str());
+        let checksum = calculate_checksum(0x15, address, &[]);
+        srecord_str.push_str(
+            format!("S315{address:08X}00000000000000000000000000000000{checksum:02X}\n").as_str(),
+        );
     }
 
-    let mut group = c.benchmark_group("from_str");
-    group.bench_with_input("from_str", srecord_str.as_str(), |b, s| {
-        b.iter(|| SRecordFile::from_str(s));
+    let mut group = c.benchmark_group("Sequential data");
+    group.bench_with_input("1M 16 byte", srecord_str.as_str(), |b, s| {
+        b.iter(|| SRecordFile::from_str(s).unwrap());
+    });
+
+    let mut srecord_str = String::new();
+    let num_rows: u32 = 500000;
+    srecord_str.reserve(
+        "S32500000000000000000000000000000000000000000000000000000000000000000000XX\n".len()
+            * num_rows as usize,
+    );
+    for i in 0..num_rows {
+        let address = i * 16;
+        let checksum = calculate_checksum(0x25, address, &[]);
+        srecord_str
+            .push_str(format!("S325{address:08X}0000000000000000000000000000000000000000000000000000000000000000{checksum:02X}\n").as_str());
+    }
+
+    group.bench_with_input("500k 32 byte", srecord_str.as_str(), |b, s| {
+        b.iter(|| SRecordFile::from_str(s).unwrap());
     });
 }
 
 criterion_group! {
     name = benches;
     config = Criterion::default();
-    targets = bench_calculate_checksum, bench_from_str
+    targets = bench_calculate_checksum, bench_from_str,
 }
 criterion_main!(benches);
