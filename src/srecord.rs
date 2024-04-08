@@ -538,7 +538,7 @@ fn parse_data_and_checksum(
 /// The checksum is calculated from the sum of all the individual bytes, from `byte_count`,
 /// individual `address` bytes and all bytes in `data`. All but the least significant byte is
 /// discarded, and is then bitwise inverted.
-fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
+pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
     let mut checksum = Wrapping(byte_count);
     for byte in address.to_be_bytes().iter() {
         checksum += byte;
