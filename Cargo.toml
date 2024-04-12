@@ -6,13 +6,8 @@ edition = "2021"
 [lib]
 name = "srex"
 
-[[bin]]
-name = "srex"
-
 [dependencies]
-clap = { version = "^4.5.0", features = ["derive"] }
 hex = "0.4.3"
-log = "0.4.21"
 
 [dev-dependencies]
 criterion = "0.3"
