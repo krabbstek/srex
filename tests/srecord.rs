@@ -172,6 +172,13 @@ fn test_parse_record() {
             error_type: ErrorType::InvalidByteCount
         })
     );
+    // Byte count lower than possible
+    assert_eq!(
+        parse_record("S1000000FF"),
+        Err(SRecordParseError {
+            error_type: ErrorType::ByteCountTooLowForRecordType
+        })
+    );
 
     // No address
     assert_eq!(

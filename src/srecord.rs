@@ -568,6 +568,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_record_type_fmt() {
+        let s0 = RecordType::S0;
+        let s1 = RecordType::S1;
+        let s2 = RecordType::S2;
+        let s3 = RecordType::S3;
+        let s5 = RecordType::S5;
+        let s6 = RecordType::S6;
+        let s7 = RecordType::S7;
+        let s8 = RecordType::S8;
+        let s9 = RecordType::S9;
+        assert_eq!(format!("{s0}"), "S0");
+        assert_eq!(format!("{s1}"), "S1");
+        assert_eq!(format!("{s2}"), "S2");
+        assert_eq!(format!("{s3}"), "S3");
+        assert_eq!(format!("{s5}"), "S5");
+        assert_eq!(format!("{s6}"), "S6");
+        assert_eq!(format!("{s7}"), "S7");
+        assert_eq!(format!("{s8}"), "S8");
+        assert_eq!(format!("{s9}"), "S9");
+    }
+
+    #[test]
     fn test_calculate_checksum() {
         assert_eq!(
             calculate_checksum(
