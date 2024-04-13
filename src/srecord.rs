@@ -93,11 +93,18 @@ impl fmt::Display for RecordType {
     }
 }
 
+/// Contains the information from a parsed record.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Record {
+    /// [`RecordType`] that specifies which type a [`Record`] is.
     pub record_type: RecordType,
+    /// Contains the byte count parsed from the record string.
+    ///
+    /// This field might be removed since it can be deduced from the other fields.
     pub byte_count: u8,
+    /// The parsed address from the record. Is `u32` to fit all address types in it.
     pub address: u32,
+    /// The parsed data from the record. Is empty if the [`RecordType`] does not contain any data.
     pub data: Vec<u8>,
 }
 
