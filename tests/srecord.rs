@@ -8,55 +8,46 @@ fn test_parse_record() {
 
     let record = parse_record("S007000065666700C6").unwrap();
     assert_eq!(record.record_type, RecordType::S0);
-    assert_eq!(record.byte_count, 0x07);
     assert_eq!(record.address, 0x0000);
     assert_eq!(record.data, Vec::<u8>::from([0x65, 0x66, 0x67, 0x00]));
 
     let record = parse_record("S107123401020304A8").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
-    assert_eq!(record.byte_count, 0x07);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
 
     let record = parse_record("S2081234560102030451").unwrap();
     assert_eq!(record.record_type, RecordType::S2);
-    assert_eq!(record.byte_count, 0x08);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
 
     let record = parse_record("S3091234567801020304D8").unwrap();
     assert_eq!(record.record_type, RecordType::S3);
-    assert_eq!(record.byte_count, 0x09);
     assert_eq!(record.address, 0x12345678);
     assert_eq!(record.data, Vec::<u8>::from([0x01, 0x02, 0x03, 0x04]));
 
     let record = parse_record("S5031234B6").unwrap();
     assert_eq!(record.record_type, RecordType::S5);
-    assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
     let record = parse_record("S6041234565F").unwrap();
     assert_eq!(record.record_type, RecordType::S6);
-    assert_eq!(record.byte_count, 0x04);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
     let record = parse_record("S70512345678E6").unwrap();
     assert_eq!(record.record_type, RecordType::S7);
-    assert_eq!(record.byte_count, 0x05);
     assert_eq!(record.address, 0x12345678);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
     let record = parse_record("S8041234565F").unwrap();
     assert_eq!(record.record_type, RecordType::S8);
-    assert_eq!(record.byte_count, 0x04);
     assert_eq!(record.address, 0x123456);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
     let record = parse_record("S9031234B6").unwrap();
     assert_eq!(record.record_type, RecordType::S9);
-    assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x1234);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
@@ -64,7 +55,6 @@ fn test_parse_record() {
 
     let record = parse_record("S00F000068656C6C6F202020202000003C").unwrap();
     assert_eq!(record.record_type, RecordType::S0);
-    assert_eq!(record.byte_count, 0x0F);
     assert_eq!(record.address, 0x0000);
     assert_eq!(
         record.data,
@@ -74,7 +64,6 @@ fn test_parse_record() {
     let record =
         parse_record("S11F00007C0802A6900100049421FFF07C6C1B787C8C23783C6000003863000026").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
-    assert_eq!(record.byte_count, 0x1F);
     assert_eq!(record.address, 0x0000);
     assert_eq!(
         record.data,
@@ -87,7 +76,6 @@ fn test_parse_record() {
     let record =
         parse_record("S11F001C4BFFFFE5398000007D83637880010014382100107C0803A64E800020E9").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
-    assert_eq!(record.byte_count, 0x1F);
     assert_eq!(record.address, 0x001C);
     assert_eq!(
         record.data,
@@ -99,7 +87,6 @@ fn test_parse_record() {
 
     let record = parse_record("S111003848656C6C6F20776F726C642E0A0042").unwrap();
     assert_eq!(record.record_type, RecordType::S1);
-    assert_eq!(record.byte_count, 0x11);
     assert_eq!(record.address, 0x0038);
     assert_eq!(
         record.data,
@@ -110,13 +97,11 @@ fn test_parse_record() {
 
     let record = parse_record("S5030003F9").unwrap();
     assert_eq!(record.record_type, RecordType::S5);
-    assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x0003);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
     let record = parse_record("S9030000FC").unwrap();
     assert_eq!(record.record_type, RecordType::S9);
-    assert_eq!(record.byte_count, 0x03);
     assert_eq!(record.address, 0x0000);
     assert_eq!(record.data, Vec::<u8>::from([]));
 
