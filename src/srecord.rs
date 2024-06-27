@@ -104,12 +104,21 @@ pub struct Record {
     pub data: Vec<u8>,
 }
 
+// TODO: pub?
+#[derive(Debug, PartialEq, Eq)]
+pub struct DataChunk {
+    /// Inclusive address of the start of the data chunk.
+    pub address: u32,
+    /// Raw data of data chunk.
+    pub data: Vec<u8>,
+}
+
 #[derive(Debug)]
 pub struct SRecordFile {
     /// Byte vector with data in header (S0).
     pub header_data: Option<Vec<u8>>,
     /// Byte vector with actual file data (S1/S2/S3).
-    pub data: Vec<(u32, Vec<u8>)>,
+    pub data: Vec<DataChunk>,
     /// Start address at the end of the file.
     pub start_address: Option<u32>,
 }
@@ -182,39 +191,45 @@ impl SRecordFile {
     pub fn new() -> Self {
         SRecordFile {
             header_data: None,
-            data: Vec::<(u32, Vec<u8>)>::new(),
+            data: Vec::<DataChunk>::new(),
             start_address: None,
         }
     }
 
     /// Sorts data address ascending, and merges adjacent data together
     pub fn sort_data(&mut self) {
-        self.data.sort_by(|a, b| a.0.cmp(&b.0));
-        let mut new_data = Vec::<(u32, Vec<u8>)>::new();
-        for (address, vec) in self.data.iter() {
+        self.data.sort_by(|a, b| a.address.cmp(&b.address));
+        let mut new_data = Vec::<DataChunk>::new();
+        for data_chunk in self.data.iter() {
             match new_data.last_mut() {
                 Some(c) => {
-                    if *address as u64 == c.0 as u64 + c.1.len() as u64 {
-                        c.1.extend(vec);
+                    if data_chunk.address as u64 == c.address as u64 + c.data.len() as u64 {
+                        c.data.extend(data_chunk.data.iter());
                     } else {
-                        new_data.push((*address, vec.to_vec()));
+                        new_data.push(DataChunk {
+                            address: data_chunk.address,
+                            data: data_chunk.data.to_vec(),
+                        });
                     }
                 }
                 None => {
-                    new_data.push((*address, vec.to_vec()));
+                    new_data.push(DataChunk {
+                        address: data_chunk.address,
+                        data: data_chunk.data.to_vec(),
+                    });
                 }
             }
         }
         self.data = new_data;
     }
 
-    fn get_vec_containing_address(&self, address: u32) -> Option<(usize, u32, &Vec<u8>)> {
+    fn get_data_chunk_containing_address(&self, address: u32) -> Option<(usize, &DataChunk)> {
         let address = address as u64;
-        for (i, (start_address, vec)) in self.data.iter().enumerate() {
-            let start_address = *start_address as u64;
-            let end_address = start_address + vec.len() as u64;
+        for (i, data_chunk) in self.data.iter().enumerate() {
+            let start_address = data_chunk.address as u64;
+            let end_address = start_address + data_chunk.data.len() as u64;
             if start_address <= address && address < end_address {
-                return Some((i, start_address as u32, vec));
+                return Some((i, &data_chunk));
             }
         }
         None
@@ -240,17 +255,21 @@ impl FromStr for SRecordFile {
                         RecordType::S1 | RecordType::S2 | RecordType::S3 => {
                             // TODO: Validate record type (no mixes?)
                             let mut is_added_to_existing_data_part = false;
-                            for data_part in srecord_file.data.iter_mut().rev() {
-                                // TODO: Rename data_part
+                            for data_chunk in srecord_file.data.iter_mut().rev() {
                                 // Appending to existing data
-                                if record.address == (data_part.0 + data_part.1.len() as u32) {
-                                    data_part.1.extend(&record.data);
+                                if record.address
+                                    == (data_chunk.address + data_chunk.data.len() as u32)
+                                {
+                                    data_chunk.data.extend(&record.data);
                                     is_added_to_existing_data_part = true;
                                     break;
                                 }
                             }
                             if !is_added_to_existing_data_part {
-                                srecord_file.data.push((record.address, record.data));
+                                srecord_file.data.push(DataChunk {
+                                    address: record.address,
+                                    data: record.data,
+                                });
                             }
                             num_data_records += 1;
                         }
@@ -319,8 +338,8 @@ impl Index<u32> for SRecordFile {
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
     /// [`SRecordFile`].
     fn index(&self, address: u32) -> &Self::Output {
-        match self.get_vec_containing_address(address) {
-            Some((_, start_address, vec)) => &vec[(address - start_address) as usize],
+        match self.get_data_chunk_containing_address(address) {
+            Some((_, data_chunk)) => &data_chunk.data[(address - data_chunk.address) as usize],
             None => {
                 panic!("Address {address:#04X} does not exist in SRecordFile");
             }
@@ -361,11 +380,14 @@ impl Index<Range<u32>> for SRecordFile {
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
     /// the [`SRecordFile`].
     fn index(&self, address_range: Range<u32>) -> &Self::Output {
-        match self.get_vec_containing_address(address_range.start) {
-            Some((_, start_address, data)) => {
-                let start_index = address_range.start as u64 - start_address as u64;
-                let end_index = address_range.end as u64 - start_address as u64;
-                match data.get(start_index as usize..end_index as usize) {
+        match self.get_data_chunk_containing_address(address_range.start) {
+            Some((_, data_chunk)) => {
+                let start_index = address_range.start as u64 - data_chunk.address as u64;
+                let end_index = address_range.end as u64 - data_chunk.address as u64;
+                match data_chunk
+                    .data
+                    .get(start_index as usize..end_index as usize)
+                {
                     Some(slice) => slice,
                     None => {
                         let start_address = address_range.start;
@@ -416,11 +438,11 @@ impl IndexMut<u32> for SRecordFile {
     /// TODO: Implement allocating data if address does not already exist in file.
     fn index_mut(&mut self, address: u32) -> &mut Self::Output {
         let address = address as u64;
-        for (start_address, data) in self.data.iter_mut() {
-            let start_address = *start_address as u64;
-            let end_address = start_address + data.len() as u64;
+        for data_chunk in self.data.iter_mut() {
+            let start_address = data_chunk.address as u64;
+            let end_address = start_address + data_chunk.data.len() as u64;
             if (start_address <= address) && (address < end_address) {
-                return &mut data[(address - start_address) as usize];
+                return &mut data_chunk.data[(address - start_address) as usize];
             }
         }
         panic!("Address {address:#02X} does not exist in SRecordFile");
