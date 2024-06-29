@@ -65,6 +65,10 @@ impl RecordType {
             RecordType::S9 => 2,
         }
     }
+
+    pub fn num_data_bytes(&self, byte_count: usize) -> usize {
+        byte_count - (self.num_address_bytes() + 1)
+    }
 }
 
 impl fmt::Display for RecordType {
@@ -118,7 +122,7 @@ pub struct SRecordFile {
     /// Byte vector with data in header (S0).
     pub header_data: Option<Vec<u8>>,
     /// Byte vector with actual file data (S1/S2/S3).
-    pub data: Vec<DataChunk>,
+    pub data_chunks: Vec<DataChunk>,
     /// Start address at the end of the file.
     pub start_address: Option<u32>,
 }
@@ -191,16 +195,16 @@ impl SRecordFile {
     pub fn new() -> Self {
         SRecordFile {
             header_data: None,
-            data: Vec::<DataChunk>::new(),
+            data_chunks: Vec::<DataChunk>::new(),
             start_address: None,
         }
     }
 
     /// Sorts data address ascending, and merges adjacent data together
     pub fn sort_data(&mut self) {
-        self.data.sort_by(|a, b| a.address.cmp(&b.address));
+        self.data_chunks.sort_by(|a, b| a.address.cmp(&b.address));
         let mut new_data = Vec::<DataChunk>::new();
-        for data_chunk in self.data.iter() {
+        for data_chunk in self.data_chunks.iter() {
             match new_data.last_mut() {
                 Some(c) => {
                     if data_chunk.address as u64 == c.address as u64 + c.data.len() as u64 {
@@ -220,19 +224,61 @@ impl SRecordFile {
                 }
             }
         }
-        self.data = new_data;
+        self.data_chunks = new_data;
     }
 
-    fn get_data_chunk_containing_address(&self, address: u32) -> Option<(usize, &DataChunk)> {
-        let address = address as u64;
-        for (i, data_chunk) in self.data.iter().enumerate() {
-            let start_address = data_chunk.address as u64;
-            let end_address = start_address + data_chunk.data.len() as u64;
-            if start_address <= address && address < end_address {
-                return Some((i, &data_chunk));
+    fn get_data_chunk_index(&self, address: u32) -> Option<usize> {
+        let mut left_index = 0;
+        // right_index is exclusive
+        let mut right_index = self.data_chunks.len();
+        loop {
+            let index_diff = right_index - left_index;
+            if index_diff == 0 {
+                return None;
+            } else if index_diff == 1 {
+                let data_chunk = &self.data_chunks[left_index];
+                let data_chunk_start_address = data_chunk.address;
+                let data_chunk_end_address =
+                    data_chunk_start_address + data_chunk.data.len() as u32;
+                if address >= data_chunk_start_address && address < data_chunk_end_address {
+                    return Some(left_index);
+                } else {
+                    return None;
+                }
+            } else {
+                let middle_index = self.data_chunks.len() / 2;
+                let data_chunk = &self.data_chunks[left_index];
+                let data_chunk_start_address = data_chunk.address;
+                let data_chunk_end_address =
+                    data_chunk_start_address + data_chunk.data.len() as u32;
+                if address < data_chunk_start_address {
+                    right_index = middle_index;
+                } else if address >= data_chunk_end_address {
+                    left_index = middle_index;
+                } else {
+                    return Some(left_index);
+                }
             }
         }
-        None
+    }
+
+    // TODO: Documentation
+    // TODO: Tests
+    fn get_data_chunk(&self, address: u32) -> Option<&DataChunk> {
+        match self.get_data_chunk_index(address) {
+            Some(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
+            None => None,
+        }
+    }
+
+    // TODO: Documentation
+    // TODO: Allocation???
+    // TODO: Tests
+    fn get_data_chunk_mut(&mut self, address: u32) -> Option<&mut DataChunk> {
+        match self.get_data_chunk_index(address) {
+            Some(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
+            None => None,
+        }
     }
 }
 
@@ -243,61 +289,65 @@ impl FromStr for SRecordFile {
         let mut srecord_file = SRecordFile::new();
 
         let mut num_data_records: u32 = 0;
+        let mut data_buffer = [0u8; 256];
 
         for line in srecord_str.lines() {
-            match parse_record(line) {
-                Ok(record) => {
-                    match record.record_type {
-                        RecordType::S0 => {
-                            // TODO: Error if multiple header records instead of overwriting
-                            srecord_file.header_data = Some(record.data);
-                        }
-                        RecordType::S1 | RecordType::S2 | RecordType::S3 => {
-                            // TODO: Validate record type (no mixes?)
-                            let mut is_added_to_existing_data_part = false;
-                            for data_chunk in srecord_file.data.iter_mut().rev() {
-                                // Appending to existing data
-                                if record.address
-                                    == (data_chunk.address + data_chunk.data.len() as u32)
-                                {
-                                    data_chunk.data.extend(&record.data);
-                                    is_added_to_existing_data_part = true;
-                                    break;
-                                }
-                            }
-                            if !is_added_to_existing_data_part {
-                                srecord_file.data.push(DataChunk {
-                                    address: record.address,
-                                    data: record.data,
-                                });
-                            }
-                            num_data_records += 1;
-                        }
-                        RecordType::S5 | RecordType::S6 => {
-                            // TODO: Validate record count
-                            // * Only last in file
-                            // * Only once
-                            // * Ensure it matches number of encountered data records
-                            let file_num_records = record.address;
-                            if num_data_records != file_num_records {
-                                return Err(SRecordParseError {
-                                    error_type:
-                                        ErrorType::CalculatedNumRecordsNotMatchingParsedNumRecords,
-                                });
-                            }
-                        }
-                        RecordType::S7 | RecordType::S8 | RecordType::S9 => {
-                            if srecord_file.start_address.is_some() {
-                                return Err(SRecordParseError {
-                                    error_type: ErrorType::MultipleStartAddresses,
-                                });
-                            }
-                            srecord_file.start_address = Some(record.address);
+            let record_type = parse_record_type(line)?;
+            let byte_count = parse_byte_count(line)?;
+            let address = parse_address(line, &record_type)?;
+            let num_data_bytes = record_type.num_data_bytes(byte_count as usize);
+            parse_data_and_checksum(
+                line,
+                record_type.clone(),
+                byte_count,
+                address,
+                &mut data_buffer,
+            )?;
+            let data = &data_buffer[..num_data_bytes];
+
+            match record_type {
+                RecordType::S0 => {
+                    // TODO: Error if multiple header records instead of overwriting
+                    srecord_file.header_data = Some(Vec::<u8>::from(data));
+                }
+                RecordType::S1 | RecordType::S2 | RecordType::S3 => {
+                    // TODO: Validate record type (no mixes?)
+                    let mut is_added_to_existing_data_part = false;
+                    for data_chunk in srecord_file.data_chunks.iter_mut().rev() {
+                        // Appending to existing data
+                        if address == (data_chunk.address + data_chunk.data.len() as u32) {
+                            data_chunk.data.extend(data);
+                            is_added_to_existing_data_part = true;
+                            break;
                         }
                     }
+                    if !is_added_to_existing_data_part {
+                        srecord_file.data_chunks.push(DataChunk {
+                            address,
+                            data: Vec::<u8>::from(data),
+                        });
+                    }
+                    num_data_records += 1;
                 }
-                Err(err) => {
-                    return Err(err);
+                RecordType::S5 | RecordType::S6 => {
+                    // TODO: Validate record count
+                    // * Only last in file
+                    // * Only once
+                    // * Ensure it matches number of encountered data records
+                    let file_num_records = address;
+                    if num_data_records != file_num_records {
+                        return Err(SRecordParseError {
+                            error_type: ErrorType::CalculatedNumRecordsNotMatchingParsedNumRecords,
+                        });
+                    }
+                }
+                RecordType::S7 | RecordType::S8 | RecordType::S9 => {
+                    if srecord_file.start_address.is_some() {
+                        return Err(SRecordParseError {
+                            error_type: ErrorType::MultipleStartAddresses,
+                        });
+                    }
+                    srecord_file.start_address = Some(address);
                 }
             }
         }
@@ -338,8 +388,8 @@ impl Index<u32> for SRecordFile {
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
     /// [`SRecordFile`].
     fn index(&self, address: u32) -> &Self::Output {
-        match self.get_data_chunk_containing_address(address) {
-            Some((_, data_chunk)) => &data_chunk.data[(address - data_chunk.address) as usize],
+        match self.get_data_chunk(address) {
+            Some(data_chunk) => &data_chunk.data[(address - data_chunk.address) as usize],
             None => {
                 panic!("Address {address:#04X} does not exist in SRecordFile");
             }
@@ -380,8 +430,8 @@ impl Index<Range<u32>> for SRecordFile {
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
     /// the [`SRecordFile`].
     fn index(&self, address_range: Range<u32>) -> &Self::Output {
-        match self.get_data_chunk_containing_address(address_range.start) {
-            Some((_, data_chunk)) => {
+        match self.get_data_chunk(address_range.start) {
+            Some(data_chunk) => {
                 let start_index = address_range.start as u64 - data_chunk.address as u64;
                 let end_index = address_range.end as u64 - data_chunk.address as u64;
                 match data_chunk
@@ -437,15 +487,11 @@ impl IndexMut<u32> for SRecordFile {
     ///
     /// TODO: Implement allocating data if address does not already exist in file.
     fn index_mut(&mut self, address: u32) -> &mut Self::Output {
-        let address = address as u64;
-        for data_chunk in self.data.iter_mut() {
-            let start_address = data_chunk.address as u64;
-            let end_address = start_address + data_chunk.data.len() as u64;
-            if (start_address <= address) && (address < end_address) {
-                return &mut data_chunk.data[(address - start_address) as usize];
-            }
+        match self.get_data_chunk_mut(address) {
+            // TODO: Direct address indexing?
+            Some(data_chunk) => &mut data_chunk.data[(address - data_chunk.address) as usize],
+            None => panic!("Address {address:#08X} does not exist in SRecordFile"),
         }
-        panic!("Address {address:#02X} does not exist in SRecordFile");
     }
 }
 
@@ -503,7 +549,7 @@ fn parse_byte_count(record_str: &str) -> Result<u8, SRecordParseError> {
 
 /// Parses address from `record_str` and returns it, or error message
 #[inline]
-fn parse_address(record_str: &str, record_type: RecordType) -> Result<u32, SRecordParseError> {
+fn parse_address(record_str: &str, record_type: &RecordType) -> Result<u32, SRecordParseError> {
     let num_address_bytes = record_type.num_address_bytes();
     let num_address_chars = num_address_bytes * 2;
     let address_start_index = 4;
@@ -531,7 +577,8 @@ fn parse_data_and_checksum(
     record_type: RecordType,
     byte_count: u8,
     address: u32,
-) -> Result<Vec<u8>, SRecordParseError> {
+    data: &mut [u8],
+) -> Result<(), SRecordParseError> {
     // TODO: Validate record type?
 
     let num_address_bytes = record_type.num_address_bytes();
@@ -543,13 +590,14 @@ fn parse_data_and_checksum(
             })
         }
     };
+    let data = &mut data[..num_data_bytes];
 
     // Parse data
     let data_start_index = 2 + 2 + 2 * num_address_bytes; // S* + byte count + address
     let data_end_index = data_start_index + num_data_bytes * 2;
-    let record_data = match record_str.get(data_start_index..data_end_index) {
-        Some(data_str) => match hex::decode(data_str) {
-            Ok(vec) => vec,
+    match record_str.get(data_start_index..data_end_index) {
+        Some(data_str) => match hex::decode_to_slice(data_str, data) {
+            Ok(_) => {}
             Err(_) => {
                 return Err(SRecordParseError {
                     error_type: ErrorType::InvalidData,
@@ -581,7 +629,7 @@ fn parse_data_and_checksum(
             });
         }
     };
-    let expected_checksum = calculate_checksum(byte_count, address, record_data.as_slice());
+    let expected_checksum = calculate_checksum(byte_count, address, data);
     if checksum != expected_checksum {
         return Err(SRecordParseError {
             error_type: ErrorType::CalculatedChecksumNotMatchingParsedChecksum,
@@ -595,7 +643,7 @@ fn parse_data_and_checksum(
         });
     }
 
-    Ok(record_data)
+    Ok(())
 }
 
 /// Calculate the checksum for a single record (line).
@@ -612,19 +660,6 @@ pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
         checksum += byte;
     }
     0xFF - checksum.0
-}
-
-/// Parse a record (single line) from an SRecord file.
-pub fn parse_record(record_str: &str) -> Result<Record, SRecordParseError> {
-    let record_type = parse_record_type(record_str)?;
-    let byte_count = parse_byte_count(record_str)?;
-    let address = parse_address(record_str, record_type.clone())?;
-    let data = parse_data_and_checksum(record_str, record_type.clone(), byte_count, address)?;
-    Ok(Record {
-        record_type,
-        address,
-        data,
-    })
 }
 
 #[cfg(test)]
