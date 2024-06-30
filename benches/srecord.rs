@@ -40,7 +40,7 @@ fn bench_from_str(c: &mut Criterion) {
             * num_rows as usize,
     );
     for i in 0..num_rows {
-        let address = i * 16;
+        let address = i * 32;
         let checksum = calculate_checksum(0x25, address, &[]);
         srecord_str
             .push_str(format!("S325{address:08X}0000000000000000000000000000000000000000000000000000000000000000{checksum:02X}\n").as_str());

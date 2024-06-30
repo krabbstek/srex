@@ -200,63 +200,40 @@ impl SRecordFile {
         }
     }
 
-    /// Sorts data address ascending, and merges adjacent data together
-    pub fn sort_data(&mut self) {
-        self.data_chunks.sort_by(|a, b| a.address.cmp(&b.address));
-        let mut new_data = Vec::<DataChunk>::new();
-        for data_chunk in self.data_chunks.iter() {
-            match new_data.last_mut() {
-                Some(c) => {
-                    if data_chunk.address as u64 == c.address as u64 + c.data.len() as u64 {
-                        c.data.extend(data_chunk.data.iter());
-                    } else {
-                        new_data.push(DataChunk {
-                            address: data_chunk.address,
-                            data: data_chunk.data.to_vec(),
-                        });
-                    }
-                }
-                None => {
-                    new_data.push(DataChunk {
-                        address: data_chunk.address,
-                        data: data_chunk.data.to_vec(),
-                    });
-                }
-            }
-        }
-        self.data_chunks = new_data;
-    }
-
-    fn get_data_chunk_index(&self, address: u32) -> Option<usize> {
+    // TODO: Documentation
+    // TODO: Unit tests
+    fn get_data_chunk_index(&self, address: u32, inclusive_end: bool) -> Result<usize, usize> {
         let mut left_index = 0;
-        // right_index is exclusive
         let mut right_index = self.data_chunks.len();
         loop {
             let index_diff = right_index - left_index;
             if index_diff == 0 {
-                return None;
-            } else if index_diff == 1 {
-                let data_chunk = &self.data_chunks[left_index];
-                let data_chunk_start_address = data_chunk.address;
-                let data_chunk_end_address =
-                    data_chunk_start_address + data_chunk.data.len() as u32;
+                return Err(left_index);
+            }
+            // TODO: u32 vs u64?
+            let data_chunk = &self.data_chunks[left_index];
+            let data_chunk_start_address = data_chunk.address;
+            let mut data_chunk_end_address =
+                data_chunk_start_address + data_chunk.data.len() as u32;
+            if inclusive_end {
+                data_chunk_end_address += 1;
+            }
+            if index_diff == 1 {
                 if address >= data_chunk_start_address && address < data_chunk_end_address {
-                    return Some(left_index);
+                    return Ok(left_index);
+                } else if address < data_chunk_start_address {
+                    return Err(left_index);
                 } else {
-                    return None;
+                    return Err(right_index);
                 }
             } else {
                 let middle_index = self.data_chunks.len() / 2;
-                let data_chunk = &self.data_chunks[left_index];
-                let data_chunk_start_address = data_chunk.address;
-                let data_chunk_end_address =
-                    data_chunk_start_address + data_chunk.data.len() as u32;
                 if address < data_chunk_start_address {
                     right_index = middle_index;
                 } else if address >= data_chunk_end_address {
                     left_index = middle_index;
                 } else {
-                    return Some(left_index);
+                    return Ok(left_index);
                 }
             }
         }
@@ -265,9 +242,9 @@ impl SRecordFile {
     // TODO: Documentation
     // TODO: Tests
     fn get_data_chunk(&self, address: u32) -> Option<&DataChunk> {
-        match self.get_data_chunk_index(address) {
-            Some(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
-            None => None,
+        match self.get_data_chunk_index(address, false) {
+            Ok(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
+            Err(_) => None,
         }
     }
 
@@ -275,10 +252,35 @@ impl SRecordFile {
     // TODO: Allocation???
     // TODO: Tests
     fn get_data_chunk_mut(&mut self, address: u32) -> Option<&mut DataChunk> {
-        match self.get_data_chunk_index(address) {
-            Some(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
-            None => None,
+        match self.get_data_chunk_index(address, false) {
+            Ok(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
+            Err(_) => None,
         }
+    }
+
+    // TODO: Documentation
+    fn merge_data_chunks(&mut self) -> Result<(), SRecordParseError> {
+        let mut index = 0;
+        while index < self.data_chunks.len() - 1 {
+            let current_end_address =
+                self.data_chunks[index].address as u64 + self.data_chunks[index].data.len() as u64;
+            let next_index = index + 1;
+            let next_start_address = self.data_chunks[next_index].address as u64;
+            if next_start_address > current_end_address {
+                index += 1;
+            } else if next_start_address == current_end_address {
+                // Merge
+                let mut next_data_chunk = self.data_chunks.remove(next_index);
+                self.data_chunks[index]
+                    .data
+                    .append(&mut next_data_chunk.data);
+            } else {
+                return Err(SRecordParseError {
+                    error_type: ErrorType::OverlappingData,
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -312,20 +314,29 @@ impl FromStr for SRecordFile {
                 }
                 RecordType::S1 | RecordType::S2 | RecordType::S3 => {
                     // TODO: Validate record type (no mixes?)
-                    let mut is_added_to_existing_data_part = false;
-                    for data_chunk in srecord_file.data_chunks.iter_mut().rev() {
-                        // Appending to existing data
-                        if address == (data_chunk.address + data_chunk.data.len() as u32) {
-                            data_chunk.data.extend(data);
-                            is_added_to_existing_data_part = true;
-                            break;
+                    match srecord_file.get_data_chunk_index(address, true) {
+                        Ok(data_chunk_index) => {
+                            // Error if writing to the same address twice
+                            let data_chunk = &mut srecord_file.data_chunks[data_chunk_index];
+                            if data_chunk.address as usize + data_chunk.data.len()
+                                != address as usize
+                            {
+                                return Err(SRecordParseError {
+                                    error_type: ErrorType::OverlappingData,
+                                });
+                            }
+                            data_chunk.data.extend_from_slice(data);
                         }
-                    }
-                    if !is_added_to_existing_data_part {
-                        srecord_file.data_chunks.push(DataChunk {
-                            address,
-                            data: Vec::<u8>::from(data),
-                        });
+                        Err(data_chunk_index) => {
+                            // TODO: Move out to allocation function?
+                            srecord_file.data_chunks.insert(
+                                data_chunk_index,
+                                DataChunk {
+                                    address,
+                                    data: Vec::<u8>::from(data),
+                                },
+                            );
+                        }
                     }
                     num_data_records += 1;
                 }
@@ -352,7 +363,8 @@ impl FromStr for SRecordFile {
             }
         }
 
-        srecord_file.sort_data();
+        // Merge data chunks
+        srecord_file.merge_data_chunks()?;
 
         Ok(srecord_file)
     }
