@@ -1,5 +1,6 @@
 use core::ops::Range;
 
+use std::cmp::Ordering;
 use std::fmt;
 use std::num::Wrapping;
 use std::ops::{Index, IndexMut};
@@ -266,18 +267,20 @@ impl SRecordFile {
                 self.data_chunks[index].address as u64 + self.data_chunks[index].data.len() as u64;
             let next_index = index + 1;
             let next_start_address = self.data_chunks[next_index].address as u64;
-            if next_start_address > current_end_address {
-                index += 1;
-            } else if next_start_address == current_end_address {
-                // Merge
-                let mut next_data_chunk = self.data_chunks.remove(next_index);
-                self.data_chunks[index]
-                    .data
-                    .append(&mut next_data_chunk.data);
-            } else {
-                return Err(SRecordParseError {
-                    error_type: ErrorType::OverlappingData,
-                });
+            match next_start_address.cmp(&current_end_address) {
+                Ordering::Greater => index += 1,
+                Ordering::Equal => {
+                    // Merge
+                    let mut next_data_chunk = self.data_chunks.remove(next_index);
+                    self.data_chunks[index]
+                        .data
+                        .append(&mut next_data_chunk.data);
+                }
+                Ordering::Less => {
+                    return Err(SRecordParseError {
+                        error_type: ErrorType::OverlappingData,
+                    })
+                }
             }
         }
         Ok(())
@@ -551,11 +554,9 @@ fn parse_byte_count(record_str: &str) -> Result<u8, SRecordParseError> {
                 error_type: ErrorType::InvalidByteCount,
             }),
         },
-        None => {
-            return Err(SRecordParseError {
-                error_type: ErrorType::EolWhileParsingByteCount,
-            })
-        }
+        None => Err(SRecordParseError {
+            error_type: ErrorType::EolWhileParsingByteCount,
+        }),
     }
 }
 
