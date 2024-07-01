@@ -2,7 +2,8 @@ use std::str::FromStr;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use srex::srecord::*;
+use srex::srecord::utils::calculate_checksum;
+use srex::srecord::SRecordFile;
 
 fn bench_calculate_checksum(c: &mut Criterion) {
     let mut group = c.benchmark_group("calculate_checksum");
