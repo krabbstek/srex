@@ -58,14 +58,14 @@ pub(crate) fn parse_byte_count(record_str: &str) -> Result<u8, SRecordParseError
 pub(crate) fn parse_address(
     record_str: &str,
     record_type: &RecordType,
-) -> Result<u32, SRecordParseError> {
+) -> Result<u64, SRecordParseError> {
     let num_address_bytes = record_type.num_address_bytes();
     let num_address_chars = num_address_bytes * 2;
     let address_start_index = 4;
     let address_end_index = address_start_index + num_address_chars;
 
     match record_str.get(address_start_index..address_end_index) {
-        Some(address_str) => match u32::from_str_radix(address_str, 16) {
+        Some(address_str) => match u64::from_str_radix(address_str, 16) {
             Ok(i) => Ok(i),
             Err(_) => Err(SRecordParseError {
                 error_type: ErrorType::InvalidAddress,
@@ -85,7 +85,7 @@ pub(crate) fn parse_data_and_checksum(
     record_str: &str,
     record_type: RecordType,
     byte_count: u8,
-    address: u32,
+    address: u64,
     data: &mut [u8],
 ) -> Result<(), SRecordParseError> {
     // TODO: Validate record type?
@@ -162,7 +162,7 @@ pub(crate) fn parse_data_and_checksum(
 /// discarded, and is then bitwise inverted.
 ///
 /// TODO: Pub????
-pub fn calculate_checksum(byte_count: u8, address: u32, data: &[u8]) -> u8 {
+pub fn calculate_checksum(byte_count: u8, address: u64, data: &[u8]) -> u8 {
     let mut checksum = Wrapping(byte_count);
     for byte in address.to_be_bytes().iter() {
         checksum += byte;

@@ -17,7 +17,7 @@ pub struct SRecordFile {
     /// Byte vector with actual file data (S1/S2/S3).
     pub data_chunks: Vec<DataChunk>,
     /// Start address at the end of the file.
-    pub start_address: Option<u32>,
+    pub start_address: Option<u64>,
 }
 
 impl Default for SRecordFile {
@@ -39,7 +39,7 @@ impl SRecordFile {
 
     // TODO: Documentation
     // TODO: Unit tests
-    fn get_data_chunk_index(&self, address: u32, inclusive_end: bool) -> Result<usize, usize> {
+    fn get_data_chunk_index(&self, address: u64, inclusive_end: bool) -> Result<usize, usize> {
         let mut left_index = 0;
         let mut right_index = self.data_chunks.len();
         loop {
@@ -47,11 +47,10 @@ impl SRecordFile {
             if index_diff == 0 {
                 return Err(left_index);
             }
-            // TODO: u32 vs u64?
             let data_chunk = &self.data_chunks[left_index];
             let data_chunk_start_address = data_chunk.address;
             let mut data_chunk_end_address =
-                data_chunk_start_address + data_chunk.data.len() as u32;
+                data_chunk_start_address + data_chunk.data.len() as u64;
             if inclusive_end {
                 data_chunk_end_address += 1;
             }
@@ -78,7 +77,7 @@ impl SRecordFile {
 
     // TODO: Documentation
     // TODO: Tests
-    pub(crate) fn get_data_chunk(&self, address: u32) -> Option<&DataChunk> {
+    pub(crate) fn get_data_chunk(&self, address: u64) -> Option<&DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
             Err(_) => None,
@@ -88,7 +87,7 @@ impl SRecordFile {
     // TODO: Documentation
     // TODO: Allocation???
     // TODO: Tests
-    pub(crate) fn get_data_chunk_mut(&mut self, address: u32) -> Option<&mut DataChunk> {
+    pub(crate) fn get_data_chunk_mut(&mut self, address: u64) -> Option<&mut DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
             Err(_) => None,
@@ -100,9 +99,9 @@ impl SRecordFile {
         let mut index = 0;
         while index < self.data_chunks.len() - 1 {
             let current_end_address =
-                self.data_chunks[index].address as u64 + self.data_chunks[index].data.len() as u64;
+                self.data_chunks[index].address + self.data_chunks[index].data.len() as u64;
             let next_index = index + 1;
-            let next_start_address = self.data_chunks[next_index].address as u64;
+            let next_start_address = self.data_chunks[next_index].address;
             match next_start_address.cmp(&current_end_address) {
                 Ordering::Greater => index += 1,
                 Ordering::Equal => {
@@ -123,17 +122,17 @@ impl SRecordFile {
     }
 }
 
-impl Get<u32> for SRecordFile {
+impl Get<u64> for SRecordFile {
     type Output = u8;
 
-    fn get(&self, address: u32) -> Option<&Self::Output> {
+    fn get(&self, address: u64) -> Option<&Self::Output> {
         match self.get_data_chunk(address) {
             Some(data_chunk) => data_chunk.get(address),
             None => None,
         }
     }
 
-    fn get_mut(&mut self, address: u32) -> Option<&mut Self::Output> {
+    fn get_mut(&mut self, address: u64) -> Option<&mut Self::Output> {
         match self.get_data_chunk_mut(address) {
             Some(data_chunk) => data_chunk.get_mut(address),
             None => None,
@@ -141,17 +140,17 @@ impl Get<u32> for SRecordFile {
     }
 }
 
-impl Get<Range<u32>> for SRecordFile {
+impl Get<Range<u64>> for SRecordFile {
     type Output = [u8];
 
-    fn get(&self, address_range: Range<u32>) -> Option<&Self::Output> {
+    fn get(&self, address_range: Range<u64>) -> Option<&Self::Output> {
         match self.get_data_chunk(address_range.start) {
             Some(data_chunk) => data_chunk.get(address_range),
             None => None,
         }
     }
 
-    fn get_mut(&mut self, address_range: Range<u32>) -> Option<&mut Self::Output> {
+    fn get_mut(&mut self, address_range: Range<u64>) -> Option<&mut Self::Output> {
         match self.get_data_chunk_mut(address_range.start) {
             Some(data_chunk) => data_chunk.get_mut(address_range),
             None => None,
@@ -159,7 +158,7 @@ impl Get<Range<u32>> for SRecordFile {
     }
 }
 
-impl Index<u32> for SRecordFile {
+impl Index<u64> for SRecordFile {
     type Output = u8;
 
     /// Index the data inside the [`SRecordFile`] using the syntax
@@ -188,7 +187,7 @@ impl Index<u32> for SRecordFile {
     ///
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
     /// [`SRecordFile`].
-    fn index(&self, address: u32) -> &Self::Output {
+    fn index(&self, address: u64) -> &Self::Output {
         match self.get(address) {
             Some(data) => data,
             None => panic!("Address {address:#08X} does not exist in SRecordFile"),
@@ -196,7 +195,7 @@ impl Index<u32> for SRecordFile {
     }
 }
 
-impl Index<Range<u32>> for SRecordFile {
+impl Index<Range<u64>> for SRecordFile {
     type Output = [u8];
 
     /// Get a slice for the data inside the [`SRecordFile`] using the syntax
@@ -228,7 +227,7 @@ impl Index<Range<u32>> for SRecordFile {
     ///
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
     /// the [`SRecordFile`].
-    fn index(&self, address_range: Range<u32>) -> &Self::Output {
+    fn index(&self, address_range: Range<u64>) -> &Self::Output {
         let start_address = address_range.start;
         let end_address = address_range.end;
         match self.get(address_range) {
@@ -238,7 +237,7 @@ impl Index<Range<u32>> for SRecordFile {
     }
 }
 
-impl IndexMut<u32> for SRecordFile {
+impl IndexMut<u64> for SRecordFile {
     /// Performs mutable indexing in [`SRecordFile`], allowing writing using syntax
     /// `srecord_file[0x1234] = 0xFF`.
     ///
@@ -265,7 +264,7 @@ impl IndexMut<u32> for SRecordFile {
     ///
     /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
     /// the [`SRecordFile`].
-    fn index_mut(&mut self, address: u32) -> &mut Self::Output {
+    fn index_mut(&mut self, address: u64) -> &mut Self::Output {
         match self.get_mut(address) {
             Some(data) => data,
             None => panic!("Address {address:#08X} does not exist in SRecordFile"),
@@ -273,8 +272,8 @@ impl IndexMut<u32> for SRecordFile {
     }
 }
 
-impl IndexMut<Range<u32>> for SRecordFile {
-    fn index_mut(&mut self, address_range: Range<u32>) -> &mut Self::Output {
+impl IndexMut<Range<u64>> for SRecordFile {
+    fn index_mut(&mut self, address_range: Range<u64>) -> &mut Self::Output {
         let start_address = address_range.start;
         let end_address = address_range.end;
         match self.get_mut(address_range) {
@@ -290,7 +289,7 @@ impl FromStr for SRecordFile {
     fn from_str(srecord_str: &str) -> Result<Self, Self::Err> {
         let mut srecord_file = SRecordFile::new();
 
-        let mut num_data_records: u32 = 0;
+        let mut num_data_records: u64 = 0;
         let mut data_buffer = [0u8; 256];
 
         for line in srecord_str.lines() {
