@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use crate::srecord::data_chunk::DataChunk;
 use crate::srecord::error::{ErrorType, SRecordParseError};
+use crate::srecord::get::Get;
 use crate::srecord::record_type::RecordType;
 use crate::srecord::utils::{
     parse_address, parse_byte_count, parse_data_and_checksum, parse_record_type,
@@ -77,7 +78,7 @@ impl SRecordFile {
 
     // TODO: Documentation
     // TODO: Tests
-    fn get_data_chunk(&self, address: u32) -> Option<&DataChunk> {
+    pub(crate) fn get_data_chunk(&self, address: u32) -> Option<&DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
             Err(_) => None,
@@ -87,7 +88,7 @@ impl SRecordFile {
     // TODO: Documentation
     // TODO: Allocation???
     // TODO: Tests
-    fn get_data_chunk_mut(&mut self, address: u32) -> Option<&mut DataChunk> {
+    pub(crate) fn get_data_chunk_mut(&mut self, address: u32) -> Option<&mut DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
             Err(_) => None,
@@ -119,6 +120,167 @@ impl SRecordFile {
             }
         }
         Ok(())
+    }
+}
+
+impl Get<u32> for SRecordFile {
+    type Output = u8;
+
+    fn get(&self, address: u32) -> Option<&Self::Output> {
+        match self.get_data_chunk(address) {
+            Some(data_chunk) => data_chunk.get(address),
+            None => None,
+        }
+    }
+
+    fn get_mut(&mut self, address: u32) -> Option<&mut Self::Output> {
+        match self.get_data_chunk_mut(address) {
+            Some(data_chunk) => data_chunk.get_mut(address),
+            None => None,
+        }
+    }
+}
+
+impl Get<Range<u32>> for SRecordFile {
+    type Output = [u8];
+
+    fn get(&self, address_range: Range<u32>) -> Option<&Self::Output> {
+        match self.get_data_chunk(address_range.start) {
+            Some(data_chunk) => data_chunk.get(address_range),
+            None => None,
+        }
+    }
+
+    fn get_mut(&mut self, address_range: Range<u32>) -> Option<&mut Self::Output> {
+        match self.get_data_chunk_mut(address_range.start) {
+            Some(data_chunk) => data_chunk.get_mut(address_range),
+            None => None,
+        }
+    }
+}
+
+impl Index<u32> for SRecordFile {
+    type Output = u8;
+
+    /// Index the data inside the [`SRecordFile`] using the syntax
+    /// `srecord_file[0x1234]`, where `0x1234` is the address inside the SRecord file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S104123401B4",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// // This will panic if 0x1234 does not exist in srecord_file
+    /// let value: u8 = srecord_file[0x1234];
+    /// println!("value = {value}");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
+    /// [`SRecordFile`].
+    fn index(&self, address: u32) -> &Self::Output {
+        match self.get(address) {
+            Some(data) => data,
+            None => panic!("Address {address:#08X} does not exist in SRecordFile"),
+        }
+    }
+}
+
+impl Index<Range<u32>> for SRecordFile {
+    type Output = [u8];
+
+    /// Get a slice for the data inside the [`SRecordFile`] using the syntax
+    /// `srecord_file[0x1235..0x1237]`, where `0x1235` and `0x1237` are addresses inside the SRecord
+    /// file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S107123401020304A8",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// // This will panic if 0x1235..0x1237 does not exist in srecord_file
+    /// let slice: &[u8] = &srecord_file[0x1235..0x1237];
+    /// let x: u8 = slice[0];
+    /// let y: u8 = slice[1];
+    /// println!("x = {x}, y = {y}");
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
+    /// the [`SRecordFile`].
+    fn index(&self, address_range: Range<u32>) -> &Self::Output {
+        let start_address = address_range.start;
+        let end_address = address_range.end;
+        match self.get(address_range) {
+            Some(data) => data,
+            None => panic!("Address range {start_address:#08X}:{end_address:#08X} does not exist in SRecordFile"),
+        }
+    }
+}
+
+impl IndexMut<u32> for SRecordFile {
+    /// Performs mutable indexing in [`SRecordFile`], allowing writing using syntax
+    /// `srecord_file[0x1234] = 0xFF`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let mut srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S107123401020304A8",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(srecord_file[0x1234], 0x01);
+    /// srecord_file[0x1234] = 0xFF;
+    /// assert_eq!(srecord_file[0x1234], 0xFF);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
+    /// the [`SRecordFile`].
+    fn index_mut(&mut self, address: u32) -> &mut Self::Output {
+        match self.get_mut(address) {
+            Some(data) => data,
+            None => panic!("Address {address:#08X} does not exist in SRecordFile"),
+        }
+    }
+}
+
+impl IndexMut<Range<u32>> for SRecordFile {
+    fn index_mut(&mut self, address_range: Range<u32>) -> &mut Self::Output {
+        let start_address = address_range.start;
+        let end_address = address_range.end;
+        match self.get_mut(address_range) {
+            Some(data) => data,
+            None => panic!("Address range {start_address:#08X}:{end_address:#08X} does not exist in SRecordFile"),
+        }
     }
 }
 
@@ -205,142 +367,5 @@ impl FromStr for SRecordFile {
         srecord_file.merge_data_chunks()?;
 
         Ok(srecord_file)
-    }
-}
-
-impl Index<u32> for SRecordFile {
-    type Output = u8;
-
-    /// Index the data inside the [`SRecordFile`] using the syntax
-    /// `srecord_file[0x1234]`, where `0x1234` is the address inside the SRecord file.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use srex::srecord::SRecordFile;
-    ///
-    /// let srecord_file: SRecordFile = [
-    ///     "S0070000484452001A",
-    ///     "S104123401B4",
-    ///     "S5030001FB",
-    ///     "S9031234B6",
-    /// ].join("\n")
-    ///     .parse()
-    ///     .unwrap();
-    ///
-    /// // This will panic if 0x1234 does not exist in srecord_file
-    /// let value: u8 = srecord_file[0x1234];
-    /// println!("value = {value}");
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
-    /// [`SRecordFile`].
-    fn index(&self, address: u32) -> &Self::Output {
-        match self.get_data_chunk(address) {
-            Some(data_chunk) => &data_chunk.data[(address - data_chunk.address) as usize],
-            None => {
-                panic!("Address {address:#04X} does not exist in SRecordFile");
-            }
-        }
-    }
-}
-
-impl Index<Range<u32>> for SRecordFile {
-    type Output = [u8];
-
-    /// Get a slice for the data inside the [`SRecordFile`] using the syntax
-    /// `srecord_file[0x1235..0x1237]`, where `0x1235` and `0x1237` are addresses inside the SRecord
-    /// file.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use srex::srecord::SRecordFile;
-    ///
-    /// let srecord_file: SRecordFile = [
-    ///     "S0070000484452001A",
-    ///     "S107123401020304A8",
-    ///     "S5030001FB",
-    ///     "S9031234B6",
-    /// ].join("\n")
-    ///     .parse()
-    ///     .unwrap();
-    ///
-    /// // This will panic if 0x1235..0x1237 does not exist in srecord_file
-    /// let slice: &[u8] = &srecord_file[0x1235..0x1237];
-    /// let x: u8 = slice[0];
-    /// let y: u8 = slice[1];
-    /// println!("x = {x}, y = {y}");
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// [`index`](SRecordFile::index) will [`panic!`] if the input address range does not exist in
-    /// the [`SRecordFile`].
-    fn index(&self, address_range: Range<u32>) -> &Self::Output {
-        match self.get_data_chunk(address_range.start) {
-            Some(data_chunk) => {
-                let start_index = address_range.start as u64 - data_chunk.address as u64;
-                let end_index = address_range.end as u64 - data_chunk.address as u64;
-                match data_chunk
-                    .data
-                    .get(start_index as usize..end_index as usize)
-                {
-                    Some(slice) => slice,
-                    None => {
-                        let start_address = address_range.start;
-                        let end_address = address_range.end;
-                        panic!("Address range {start_address}..{end_address} is not fully contained in SRecordFile");
-                    }
-                }
-            }
-            None => {
-                let start_address = address_range.start;
-                let end_address = address_range.end;
-                panic!(
-                    "Address range {start_address}..{end_address} does not exist in SRecordFile"
-                );
-            }
-        }
-    }
-}
-
-impl IndexMut<u32> for SRecordFile {
-    /// Performs mutable indexing in [`SRecordFile`], allowing writing using syntax
-    /// `srecord_file[0x1234] = 0xFF`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use srex::srecord::SRecordFile;
-    ///
-    /// let mut srecord_file: SRecordFile = [
-    ///     "S0070000484452001A",
-    ///     "S107123401020304A8",
-    ///     "S5030001FB",
-    ///     "S9031234B6",
-    /// ].join("\n")
-    ///     .parse()
-    ///     .unwrap();
-    ///
-    /// assert_eq!(srecord_file[0x1234], 0x01);
-    /// srecord_file[0x1234] = 0xFF;
-    /// assert_eq!(srecord_file[0x1234], 0xFF);
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
-    /// the [`SRecordFile`].
-    ///
-    /// TODO: Implement allocating data if address does not already exist in file.
-    fn index_mut(&mut self, address: u32) -> &mut Self::Output {
-        match self.get_data_chunk_mut(address) {
-            // TODO: Direct address indexing?
-            Some(data_chunk) => &mut data_chunk.data[(address - data_chunk.address) as usize],
-            None => panic!("Address {address:#08X} does not exist in SRecordFile"),
-        }
     }
 }

@@ -1,5 +1,6 @@
 mod data_chunk;
 mod error;
+mod get;
 mod record_type;
 mod srecord_file;
 pub mod utils;
