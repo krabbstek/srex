@@ -10,13 +10,15 @@ use crate::srecord::utils::{
     parse_address, parse_byte_count, parse_data_and_checksum, parse_record_type,
 };
 
+/// Struct that represents an SRecord file. It only contains the raw data, not the layout of the
+/// input file.
 #[derive(Debug)]
 pub struct SRecordFile {
     /// Byte vector with data in header (S0).
     pub header_data: Option<Vec<u8>>,
     /// Byte vector with actual file data (S1/S2/S3).
     pub data_chunks: Vec<DataChunk>,
-    /// Start address at the end of the file.
+    /// Start address at the end of the file (S7/S8/S9).
     pub start_address: Option<u64>,
 }
 
@@ -75,7 +77,6 @@ impl SRecordFile {
         }
     }
 
-    // TODO: Documentation
     // TODO: Tests
     pub(crate) fn get_data_chunk(&self, address: u64) -> Option<&DataChunk> {
         match self.get_data_chunk_index(address, false) {
@@ -84,8 +85,6 @@ impl SRecordFile {
         }
     }
 
-    // TODO: Documentation
-    // TODO: Allocation???
     // TODO: Tests
     pub(crate) fn get_data_chunk_mut(&mut self, address: u64) -> Option<&mut DataChunk> {
         match self.get_data_chunk_index(address, false) {
@@ -94,7 +93,7 @@ impl SRecordFile {
         }
     }
 
-    // TODO: Documentation
+    // TODO: Tests
     fn merge_data_chunks(&mut self) -> Result<(), SRecordParseError> {
         let mut index = 0;
         while index < self.data_chunks.len() - 1 {
@@ -273,6 +272,32 @@ impl IndexMut<u64> for SRecordFile {
 }
 
 impl IndexMut<Range<u64>> for SRecordFile {
+    /// Performs mutable indexing in [`SRecordFile`], allowing writing using syntax
+    /// `srecord_file[0x1234..0x1236] = [0x1A, 0x1B]`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let mut srecord_file: SRecordFile = [
+    ///     "S0070000484452001A",
+    ///     "S107123401020304A8",
+    ///     "S5030001FB",
+    ///     "S9031234B6",
+    /// ].join("\n")
+    ///     .parse()
+    ///     .unwrap();
+    ///
+    /// assert_eq!(srecord_file[0x1234..0x1236], [0x01, 0x02]);
+    /// srecord_file[0x1234..0x1236].fill(0xFF);
+    /// assert_eq!(srecord_file[0x1234..0x1236], [0xFF, 0xFF]);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
+    /// the [`SRecordFile`].
     fn index_mut(&mut self, address_range: Range<u64>) -> &mut Self::Output {
         let start_address = address_range.start;
         let end_address = address_range.end;
@@ -286,6 +311,24 @@ impl IndexMut<Range<u64>> for SRecordFile {
 impl FromStr for SRecordFile {
     type Err = SRecordParseError;
 
+    /// Parses an SRecord file and generates an [`SRecordFile`] containing the data in the file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::str::FromStr;
+    ///
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_str = "S00F000068656C6C6F202020202000003C\n\
+    ///                    S11F00007C0802A6900100049421FFF07C6C1B787C8C23783C6000003863000026\n\
+    ///                    S11F001C4BFFFFE5398000007D83637880010014382100107C0803A64E800020E9\n\
+    ///                    S111003848656C6C6F20776F726C642E0A0042\n\
+    ///                    S5030003F9\n\
+    ///                    S9030000FC";
+    /// let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+    /// ```
     fn from_str(srecord_str: &str) -> Result<Self, Self::Err> {
         let mut srecord_file = SRecordFile::new();
 

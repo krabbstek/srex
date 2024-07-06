@@ -79,7 +79,7 @@ pub(crate) fn parse_address(
 
 /// Parses data and sets slice inside record
 ///
-/// Data is added to `self` and a slice to the data is set to `record`
+/// Data is written to `data`.
 #[inline]
 pub(crate) fn parse_data_and_checksum(
     record_str: &str,

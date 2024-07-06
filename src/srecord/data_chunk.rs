@@ -44,6 +44,9 @@ impl DataChunk {
     /// };
     /// assert!(data_chunk.get(0x10000).is_some());
     /// assert!(data_chunk.get(0x10006).is_none());
+    /// assert_eq!(data_chunk.get(0x10001..0x10003).unwrap(), &[0x01u8, 0x02u8]);
+    /// assert!(data_chunk.get(0x10000..0x10006).is_some());
+    /// assert!(data_chunk.get(0x10000..0x10007).is_none());
     /// ```
     pub fn get<I>(&self, index: I) -> Option<&I::Output>
     where
@@ -52,6 +55,27 @@ impl DataChunk {
         index.get(self)
     }
 
+    /// Returns a mutable reference to a byte or byte data subslice depending on the type of index.
+    ///
+    /// - If given an address, returns a mutable reference to the byte at that address or `None` if
+    ///   out of bounds.
+    /// - If given an address range, returns the data subslice corresponding to that range, or
+    ///   `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::DataChunk;
+    ///
+    /// let mut data_chunk = DataChunk{
+    ///     address: 0x10000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05],
+    /// };
+    /// assert!(data_chunk.get_mut(0x10000).is_some());
+    /// assert_eq!(*data_chunk.get_mut(0x10000).unwrap(), 0x00u8);
+    /// *data_chunk.get_mut(0x10000).unwrap() = 0x10;
+    /// assert_eq!(*data_chunk.get_mut(0x10000).unwrap(), 0x10u8);
+    /// ```
     pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
     where
         I: SliceIndex<Self>,
