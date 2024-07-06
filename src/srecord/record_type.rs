@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::srecord::Record;
+
 /// Enum containing which type a [`Record`] is.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecordType {

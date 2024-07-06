@@ -13,7 +13,7 @@ fn bench_calculate_checksum(c: &mut Criterion) {
     let data: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     let input = (byte_count, address, &data);
     group.bench_with_input("calculate_checksum", &input, |b, i| {
-        b.iter(|| calculate_checksum(i.0, i.1, i.2))
+        b.iter(|| calculate_checksum(&i.0, &i.1, i.2))
     });
 }
 
@@ -23,7 +23,7 @@ fn bench_from_str_sequential(c: &mut Criterion) {
     srecord_str.reserve("S315000000000000000000000000000000000000EC\n".len() * num_rows as usize);
     for i in 0..num_rows {
         let address = i * 16;
-        let checksum = calculate_checksum(0x15, address, &[]);
+        let checksum = calculate_checksum(&0x15, &address, &[]);
         srecord_str.push_str(
             format!("S315{address:08X}00000000000000000000000000000000{checksum:02X}\n").as_str(),
         );
@@ -42,7 +42,7 @@ fn bench_from_str_sequential(c: &mut Criterion) {
     );
     for i in 0..num_rows {
         let address = i * 32;
-        let checksum = calculate_checksum(0x25, address, &[]);
+        let checksum = calculate_checksum(&0x25, &address, &[]);
         srecord_str
             .push_str(format!("S325{address:08X}0000000000000000000000000000000000000000000000000000000000000000{checksum:02X}\n").as_str());
     }
@@ -65,7 +65,7 @@ fn bench_from_str_data_chunks(c: &mut Criterion) {
         let start_address = 0x4000000 * chunk_idx;
         for i in 0..num_rows {
             let address = start_address + i * 16;
-            let checksum = calculate_checksum(0x15, address, &[]);
+            let checksum = calculate_checksum(&0x15, &address, &[]);
             srecord_str.push_str(
                 format!("S315{address:08X}00000000000000000000000000000000{checksum:02X}\n")
                     .as_str(),

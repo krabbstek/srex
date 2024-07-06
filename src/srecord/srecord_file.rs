@@ -4,11 +4,8 @@ use std::str::FromStr;
 
 use crate::srecord::data_chunk::DataChunk;
 use crate::srecord::error::{ErrorType, SRecordParseError};
-use crate::srecord::record_type::RecordType;
+use crate::srecord::record::Record;
 use crate::srecord::slice_index::SliceIndex;
-use crate::srecord::utils::{
-    parse_address, parse_byte_count, parse_data_and_checksum, parse_record_type,
-};
 
 /// Struct that represents an SRecord file. It only contains the raw data, not the layout of the
 /// input file.
@@ -332,75 +329,71 @@ impl FromStr for SRecordFile {
     fn from_str(srecord_str: &str) -> Result<Self, Self::Err> {
         let mut srecord_file = SRecordFile::new();
 
-        let mut num_data_records: u64 = 0;
+        let mut num_data_records: usize = 0;
         let mut data_buffer = [0u8; 256];
 
         for line in srecord_str.lines() {
-            let record_type = parse_record_type(line)?;
-            let byte_count = parse_byte_count(line)?;
-            let address = parse_address(line, &record_type)?;
-            let num_data_bytes = record_type.num_data_bytes(byte_count as usize);
-            parse_data_and_checksum(
-                line,
-                record_type.clone(),
-                byte_count,
-                address,
-                &mut data_buffer,
-            )?;
-            let data = &data_buffer[..num_data_bytes];
-
-            match record_type {
-                RecordType::S0 => {
-                    // TODO: Error if multiple header records instead of overwriting
-                    srecord_file.header_data = Some(Vec::<u8>::from(data));
-                }
-                RecordType::S1 | RecordType::S2 | RecordType::S3 => {
+            let record = Record::from_str(line, &mut data_buffer)?;
+            match record {
+                Record::S0Record(header_record) => match srecord_file.header_data {
+                    Some(_) => {
+                        return Err(SRecordParseError {
+                            error_type: ErrorType::MultipleHeaderRecords,
+                        })
+                    }
+                    None => srecord_file.header_data = Some(Vec::<u8>::from(header_record.data)),
+                },
+                Record::S1Record(data_record)
+                | Record::S2Record(data_record)
+                | Record::S3Record(data_record) => {
                     // TODO: Validate record type (no mixes?)
-                    match srecord_file.get_data_chunk_index(address, true) {
+                    match srecord_file.get_data_chunk_index(data_record.address, true) {
                         Ok(data_chunk_index) => {
                             // Error if writing to the same address twice
                             let data_chunk = &mut srecord_file.data_chunks[data_chunk_index];
                             if data_chunk.address as usize + data_chunk.data.len()
-                                != address as usize
+                                != data_record.address as usize
                             {
                                 return Err(SRecordParseError {
                                     error_type: ErrorType::OverlappingData,
                                 });
                             }
-                            data_chunk.data.extend_from_slice(data);
+                            data_chunk.data.extend_from_slice(data_record.data);
                         }
                         Err(data_chunk_index) => {
                             // TODO: Move out to allocation function?
                             srecord_file.data_chunks.insert(
                                 data_chunk_index,
                                 DataChunk {
-                                    address,
-                                    data: Vec::<u8>::from(data),
+                                    address: data_record.address,
+                                    data: Vec::<u8>::from(data_record.data),
                                 },
                             );
                         }
                     }
                     num_data_records += 1;
                 }
-                RecordType::S5 | RecordType::S6 => {
+                Record::S5Record(count_record) | Record::S6Record(count_record) => {
                     // TODO: Validate record count
                     // * Only last in file
                     // * Only once
                     // * Ensure it matches number of encountered data records
-                    let file_num_records = address;
+                    let file_num_records = count_record.record_count;
                     if num_data_records != file_num_records {
                         return Err(SRecordParseError {
                             error_type: ErrorType::CalculatedNumRecordsNotMatchingParsedNumRecords,
                         });
                     }
                 }
-                RecordType::S7 | RecordType::S8 | RecordType::S9 => {
+                Record::S7Record(start_address_record)
+                | Record::S8Record(start_address_record)
+                | Record::S9Record(start_address_record) => {
                     if srecord_file.start_address.is_some() {
                         return Err(SRecordParseError {
                             error_type: ErrorType::MultipleStartAddresses,
                         });
                     }
-                    srecord_file.start_address = Some(address);
+                    srecord_file.start_address = Some(start_address_record.start_address);
                 }
             }
         }

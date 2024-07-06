@@ -52,4 +52,7 @@ pub enum ErrorType {
     MultipleHeaderRecords,
     /// Multiple start addresses (S7|8|9) found
     MultipleStartAddresses,
+
+    /// Record type does not match file type (e.g. S1 record in S28 file)
+    RecordTypeNotMatchingFileType,
 }
