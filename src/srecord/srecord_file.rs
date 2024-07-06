@@ -36,6 +36,64 @@ impl SRecordFile {
         }
     }
 
+    /// Returns a reference to a byte or byte data subslice depending on the type of index.
+    ///
+    /// - If given an address, returns a reference to the byte at that address or `None` if out of
+    ///   bounds.
+    /// - If given an address range, returns the data subslice corresponding to that range, or
+    ///   `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_file = SRecordFile::from_str("S107100000010203E2").unwrap();
+    /// assert!(srecord_file.get(0).is_none());
+    /// assert_eq!(*srecord_file.get(0x1000).unwrap(), 0);
+    /// assert_eq!(*srecord_file.get(0x1001).unwrap(), 1);
+    /// assert_eq!(*srecord_file.get(0x1002).unwrap(), 2);
+    /// assert_eq!(*srecord_file.get(0x1003).unwrap(), 3);
+    /// assert!(srecord_file.get(0x1004).is_none());
+    /// assert_eq!(srecord_file.get(0x1000..0x1004).unwrap(), [0u8, 1u8, 2u8, 3u8]);
+    /// assert!(srecord_file.get(0x1000..0x1005).is_none());
+    /// ```
+    pub fn get<I>(&self, index: I) -> Option<&I::Output>
+    where
+        I: SliceIndex<Self>,
+    {
+        index.get(self)
+    }
+
+    /// Returns a mutable reference to a byte or byte data subslice depending on the type of index.
+    ///
+    /// - If given an address, returns a mutable reference to the byte at that address or `None` if
+    ///   out of bounds.
+    /// - If given an address range, returns the data subslice corresponding to that range, or
+    ///   `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::str::FromStr;
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let mut srecord_file = SRecordFile::from_str("S107100000010203E2").unwrap();
+    ///
+    /// assert_eq!(srecord_file.get(0x1000..0x1004).unwrap(), [0u8, 1u8, 2u8, 3u8]);
+    /// for (i, b) in srecord_file.get_mut(0x1000..0x1004).unwrap().iter_mut().enumerate() {
+    ///     *b = 0x10 + i as u8;
+    /// }
+    /// assert_eq!(srecord_file.get(0x1000..0x1004).unwrap(), [0x10u8, 0x11u8, 0x12u8, 0x13u8]);
+    /// ```
+    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    where
+        I: SliceIndex<Self>,
+    {
+        index.get_mut(self)
+    }
+
     // TODO: Documentation
     // TODO: Unit tests
     fn get_data_chunk_index(&self, address: u64, inclusive_end: bool) -> Result<usize, usize> {
