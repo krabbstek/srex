@@ -65,7 +65,7 @@ impl SRecordFile {
                     return Err(right_index);
                 }
             } else {
-                let middle_index = self.data_chunks.len() / 2;
+                let middle_index = left_index + index_diff / 2;
                 if address < data_chunk_start_address {
                     right_index = middle_index;
                 } else if address >= data_chunk_end_address {

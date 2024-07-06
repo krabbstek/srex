@@ -66,6 +66,18 @@ fn test_parse_srecord_unsorted_data() {
 }
 
 #[test]
+fn test_parse_srecord_multiple_data_chunks() {
+    let srecord_str = fs::read_to_string("tests/srec_files/data_chunks.s19").unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+    assert_eq!(srecord_file.data_chunks.len(), 16);
+    for (i, data_chunk) in srecord_file.data_chunks.iter().enumerate() {
+        let expected_start_address = 0x1000 * i as u64;
+        let expected_end_address = expected_start_address + 16;
+        assert_eq!(data_chunk.start_address(), expected_start_address);
+        assert_eq!(data_chunk.end_address(), expected_end_address);
+    }
+}
+#[test]
 fn test_parse_srecord_error() {
     assert!(SRecordFile::from_str("S").is_err());
 }
