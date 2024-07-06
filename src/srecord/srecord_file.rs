@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use crate::srecord::data_chunk::DataChunk;
 use crate::srecord::error::{ErrorType, SRecordParseError};
-use crate::srecord::get::Get;
 use crate::srecord::record_type::RecordType;
+use crate::srecord::slice_index::SliceIndex;
 use crate::srecord::utils::{
     parse_address, parse_byte_count, parse_data_and_checksum, parse_record_type,
 };
@@ -122,37 +122,37 @@ impl SRecordFile {
     }
 }
 
-impl Get<u64> for SRecordFile {
+impl SliceIndex<SRecordFile> for u64 {
     type Output = u8;
 
-    fn get(&self, address: u64) -> Option<&Self::Output> {
-        match self.get_data_chunk(address) {
-            Some(data_chunk) => data_chunk.get(address),
+    fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
+        match srecord_file.get_data_chunk(self) {
+            Some(data_chunk) => data_chunk.get(self),
             None => None,
         }
     }
 
-    fn get_mut(&mut self, address: u64) -> Option<&mut Self::Output> {
-        match self.get_data_chunk_mut(address) {
-            Some(data_chunk) => data_chunk.get_mut(address),
+    fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
+        match srecord_file.get_data_chunk_mut(self) {
+            Some(data_chunk) => data_chunk.get_mut(self),
             None => None,
         }
     }
 }
 
-impl Get<Range<u64>> for SRecordFile {
+impl SliceIndex<SRecordFile> for Range<u64> {
     type Output = [u8];
 
-    fn get(&self, address_range: Range<u64>) -> Option<&Self::Output> {
-        match self.get_data_chunk(address_range.start) {
-            Some(data_chunk) => data_chunk.get(address_range),
+    fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
+        match srecord_file.get_data_chunk(self.start) {
+            Some(data_chunk) => data_chunk.get(self),
             None => None,
         }
     }
 
-    fn get_mut(&mut self, address_range: Range<u64>) -> Option<&mut Self::Output> {
-        match self.get_data_chunk_mut(address_range.start) {
-            Some(data_chunk) => data_chunk.get_mut(address_range),
+    fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
+        match srecord_file.get_data_chunk_mut(self.start) {
+            Some(data_chunk) => data_chunk.get_mut(self),
             None => None,
         }
     }
@@ -188,7 +188,7 @@ impl Index<u64> for SRecordFile {
     /// [`index`](SRecordFile::index) will [`panic!`] if the input address does not exist in the
     /// [`SRecordFile`].
     fn index(&self, address: u64) -> &Self::Output {
-        match self.get(address) {
+        match address.get(self) {
             Some(data) => data,
             None => panic!("Address {address:#08X} does not exist in SRecordFile"),
         }
@@ -230,7 +230,7 @@ impl Index<Range<u64>> for SRecordFile {
     fn index(&self, address_range: Range<u64>) -> &Self::Output {
         let start_address = address_range.start;
         let end_address = address_range.end;
-        match self.get(address_range) {
+        match address_range.get(self) {
             Some(data) => data,
             None => panic!("Address range {start_address:#08X}:{end_address:#08X} does not exist in SRecordFile"),
         }
@@ -265,7 +265,7 @@ impl IndexMut<u64> for SRecordFile {
     /// [`index_mut`](SRecordFile::index_mut) will [`panic!`] if the input address does not exist in
     /// the [`SRecordFile`].
     fn index_mut(&mut self, address: u64) -> &mut Self::Output {
-        match self.get_mut(address) {
+        match address.get_mut(self) {
             Some(data) => data,
             None => panic!("Address {address:#08X} does not exist in SRecordFile"),
         }
@@ -276,7 +276,7 @@ impl IndexMut<Range<u64>> for SRecordFile {
     fn index_mut(&mut self, address_range: Range<u64>) -> &mut Self::Output {
         let start_address = address_range.start;
         let end_address = address_range.end;
-        match self.get_mut(address_range) {
+        match address_range.get_mut(self) {
             Some(data) => data,
             None => panic!("Address range {start_address:#08X}:{end_address:#08X} does not exist in SRecordFile"),
         }

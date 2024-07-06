@@ -9,7 +9,7 @@ fn bench_calculate_checksum(c: &mut Criterion) {
     let mut group = c.benchmark_group("calculate_checksum");
 
     let byte_count: u8 = 11;
-    let address: u32 = 0;
+    let address: u64 = 0;
     let data: [u8; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
     let input = (byte_count, address, &data);
     group.bench_with_input("calculate_checksum", &input, |b, i| {
@@ -19,7 +19,7 @@ fn bench_calculate_checksum(c: &mut Criterion) {
 
 fn bench_from_str(c: &mut Criterion) {
     let mut srecord_str = String::new();
-    let num_rows: u32 = 1000000;
+    let num_rows: u64 = 1000000;
     srecord_str.reserve("S315000000000000000000000000000000000000EC\n".len() * num_rows as usize);
     for i in 0..num_rows {
         let address = i * 16;
@@ -35,7 +35,7 @@ fn bench_from_str(c: &mut Criterion) {
     });
 
     let mut srecord_str = String::new();
-    let num_rows: u32 = 500000;
+    let num_rows: u64 = 500000;
     srecord_str.reserve(
         "S32500000000000000000000000000000000000000000000000000000000000000000000XX\n".len()
             * num_rows as usize,
