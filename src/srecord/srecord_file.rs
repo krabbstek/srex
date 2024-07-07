@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 use std::ops::{Index, IndexMut, Range};
 use std::str::FromStr;
 
-use crate::srecord::data_chunk::DataChunk;
+use crate::srecord::data_chunk::{DataChunk, DataChunkIterator};
 use crate::srecord::error::{ErrorType, SRecordParseError};
-use crate::srecord::record::Record;
 use crate::srecord::slice_index::SliceIndex;
+use crate::srecord::{CountRecord, HeaderRecord, Record, StartAddressRecord};
 
 /// Struct that represents an SRecord file. It only contains the raw data, not the layout of the
 /// input file.
@@ -92,6 +92,17 @@ impl SRecordFile {
         I: SliceIndex<Self>,
     {
         index.get_mut(self)
+    }
+
+    fn iter_records(&self, data_record_size: usize) -> SRecordFileIterator {
+        SRecordFileIterator {
+            srecord_file: self,
+            stage: SRecordFileIteratorStage::Header,
+            data_chunk_index: 0,
+            data_chunk_iterator: None,
+            data_record_size,
+            num_data_records: 0,
+        }
     }
 
     // TODO: Documentation
@@ -460,5 +471,87 @@ impl FromStr for SRecordFile {
         srecord_file.merge_data_chunks()?;
 
         Ok(srecord_file)
+    }
+}
+
+enum SRecordFileIteratorStage {
+    Header,
+    Data,
+    Count,
+    StartAddress,
+    Finished,
+}
+
+pub struct SRecordFileIterator<'a> {
+    srecord_file: &'a SRecordFile,
+    stage: SRecordFileIteratorStage,
+    data_chunk_index: usize,
+    data_chunk_iterator: Option<DataChunkIterator<'a>>,
+    data_record_size: usize,
+    num_data_records: usize,
+}
+
+impl<'a> Iterator for SRecordFileIterator<'a> {
+    type Item = Record<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.stage {
+            SRecordFileIteratorStage::Header => {
+                self.stage = SRecordFileIteratorStage::Data;
+                match self.srecord_file.header_data.as_ref() {
+                    Some(header_data) => Some(Record::S0Record(HeaderRecord {
+                        data: header_data.as_slice(),
+                    })),
+                    None => self.next(),
+                }
+            }
+            SRecordFileIteratorStage::Data => {
+                self.num_data_records += 1;
+                match self.data_chunk_iterator.as_mut() {
+                    Some(mut iterator) => match iterator.next() {
+                        Some(record) => Some(Record::S3Record(record)),
+                        None => {
+                            self.data_chunk_index += 1;
+                            self.next()
+                        }
+                    },
+                    None => {
+                        match self.srecord_file.data_chunks.get(self.data_chunk_index) {
+                            Some(data_chunk) => {
+                                self.data_chunk_iterator =
+                                    Some(data_chunk.iter_records(self.data_record_size));
+                            }
+                            None => {
+                                self.stage = SRecordFileIteratorStage::Count;
+                            }
+                        }
+                        self.next()
+                    }
+                }
+                //panic!("Not implemented :(");
+            }
+            SRecordFileIteratorStage::Count => {
+                self.stage = SRecordFileIteratorStage::StartAddress;
+                if self.num_data_records < 1 << 16 {
+                    Some(Record::S5Record(CountRecord {
+                        record_count: self.num_data_records,
+                    }))
+                } else if self.num_data_records < 1 << 24 {
+                    Some(Record::S6Record(CountRecord {
+                        record_count: self.num_data_records,
+                    }))
+                } else {
+                    self.next()
+                }
+            }
+            SRecordFileIteratorStage::StartAddress => match self.srecord_file.start_address {
+                Some(start_address) => Some(Record::S7Record(StartAddressRecord { start_address })),
+                None => {
+                    self.stage = SRecordFileIteratorStage::Finished;
+                    self.next()
+                }
+            },
+            SRecordFileIteratorStage::Finished => None,
+        }
     }
 }

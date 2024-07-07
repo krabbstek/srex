@@ -1,6 +1,8 @@
+use std::cmp::max;
 use std::ops::Range;
 
 use crate::srecord::slice_index::SliceIndex;
+use crate::srecord::DataRecord;
 
 /// A contiguous chunk of data at a specific address.
 ///
@@ -82,6 +84,15 @@ impl DataChunk {
     {
         index.get_mut(self)
     }
+
+    // TODO: Alignment
+    pub fn iter_records(&self, record_size: usize) -> DataChunkIterator {
+        DataChunkIterator {
+            data_chunk: &self,
+            record_size,
+            address: self.address,
+        }
+    }
 }
 
 impl SliceIndex<DataChunk> for u64 {
@@ -125,6 +136,34 @@ impl SliceIndex<DataChunk> for Range<u64> {
                     .get_mut(start_index as usize..end_index as usize),
                 None => None,
             },
+            None => None,
+        }
+    }
+}
+
+pub struct DataChunkIterator<'a> {
+    data_chunk: &'a DataChunk,
+    record_size: usize,
+    address: u64,
+}
+
+impl<'a> Iterator for DataChunkIterator<'a> {
+    type Item = DataRecord<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let start_address = self.address;
+        let end_address = max(
+            start_address + self.record_size as u64,
+            self.data_chunk.end_address(),
+        );
+        match self.data_chunk.get(start_address..end_address) {
+            Some(data) => {
+                self.address = end_address;
+                Some(DataRecord {
+                    address: start_address,
+                    data,
+                })
+            }
             None => None,
         }
     }
