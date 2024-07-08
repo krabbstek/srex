@@ -14,6 +14,7 @@ pub struct SRecordFile {
     /// Byte vector with data in header (S0).
     pub header_data: Option<Vec<u8>>,
     /// Byte vector with actual file data (S1/S2/S3).
+    // TODO: Make private?
     pub data_chunks: Vec<DataChunk>,
     /// Start address at the end of the file (S7/S8/S9).
     pub start_address: Option<u64>,
@@ -26,8 +27,9 @@ impl Default for SRecordFile {
 }
 
 impl SRecordFile {
-    /// Creates a new [`SRecordFile`] object with empty `data_chunks` and `None`
-    /// `header_data` and `start_address`.
+    /// Creates a new [`SRecordFile`] object with empty [`data_chunks`](`SRecordFile::data_chunks`)
+    /// and `None` [`header_data`](`SRecordFile::header_data`) and
+    /// [`start_address`](`SRecordFile::start_address`).
     pub fn new() -> Self {
         SRecordFile {
             header_data: None,
@@ -50,12 +52,16 @@ impl SRecordFile {
     /// use srex::srecord::SRecordFile;
     ///
     /// let srecord_file = SRecordFile::from_str("S107100000010203E2").unwrap();
+    ///
+    /// // Single addresses return single bytes of data.
     /// assert!(srecord_file.get(0).is_none());
     /// assert_eq!(*srecord_file.get(0x1000).unwrap(), 0);
     /// assert_eq!(*srecord_file.get(0x1001).unwrap(), 1);
     /// assert_eq!(*srecord_file.get(0x1002).unwrap(), 2);
     /// assert_eq!(*srecord_file.get(0x1003).unwrap(), 3);
     /// assert!(srecord_file.get(0x1004).is_none());
+    ///
+    /// // Address ranges return slices of data.
     /// assert_eq!(srecord_file.get(0x1000..0x1004).unwrap(), [0u8, 1u8, 2u8, 3u8]);
     /// assert!(srecord_file.get(0x1000..0x1005).is_none());
     /// ```
@@ -79,8 +85,14 @@ impl SRecordFile {
     /// use std::str::FromStr;
     /// use srex::srecord::SRecordFile;
     ///
-    /// let mut srecord_file = SRecordFile::from_str("S107100000010203E2").unwrap();
+    /// let mut srecord_file = SRecordFile::from_str("S10810000001020304DD").unwrap();
     ///
+    /// // Single address return single bytes of data.
+    /// assert_eq!(*srecord_file.get(0x1004).unwrap(), 0x04);
+    /// *srecord_file.get_mut(0x1004).unwrap() = 0xAA;
+    /// assert_eq!(*srecord_file.get(0x1004).unwrap(), 0xAA);
+    ///
+    /// // Address ranges return slices of data.
     /// assert_eq!(srecord_file.get(0x1000..0x1004).unwrap(), [0u8, 1u8, 2u8, 3u8]);
     /// for (i, b) in srecord_file.get_mut(0x1000..0x1004).unwrap().iter_mut().enumerate() {
     ///     *b = 0x10 + i as u8;
@@ -125,8 +137,7 @@ impl SRecordFile {
     ///     println!("{}", record.serialize());
     /// }
     /// ```
-    ///
-    /// TODO: Allow different file types
+    // TODO: Allow different file types
     pub fn iter_records(&self, data_record_size: usize) -> SRecordFileIterator {
         SRecordFileIterator {
             srecord_file: self,
