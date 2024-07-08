@@ -169,7 +169,22 @@ impl SliceIndex<DataChunk> for u64 {
 impl SliceIndex<DataChunk> for Range<u64> {
     type Output = [u8];
 
-    // TODO: Documentation
+    /// Returns a reference to a data slice in a [`DataChunk`], at the address range that `self`
+    /// points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::DataChunk;
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let data_chunk = DataChunk{
+    ///     address: 0x1000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03],
+    /// };
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get(&data_chunk).unwrap(), [0x01, 0x02]);
+    /// assert!((0x1000 as u64..0x1005 as u64).get(&data_chunk).is_none());
+    /// ```
     fn get(self, data_chunk: &DataChunk) -> Option<&[u8]> {
         match self.start.checked_sub(data_chunk.address) {
             Some(start_index) => match self.end.checked_sub(data_chunk.address) {
@@ -182,7 +197,24 @@ impl SliceIndex<DataChunk> for Range<u64> {
         }
     }
 
-    // TODO: Documentation
+    /// Returns a mutable reference to a data slice in a [`DataChunk`], at the address range that
+    /// `self` points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::DataChunk;
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let mut data_chunk = DataChunk{
+    ///     address: 0x1000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03],
+    /// };
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get_mut(&mut data_chunk).unwrap(), [0x01, 0x02]);
+    /// (0x1001 as u64..0x1003).get_mut(&mut data_chunk).unwrap().fill(0xAA);
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get_mut(&mut data_chunk).unwrap(), [0xAA, 0xAA]);
+    /// assert!((0x1000 as u64..0x1005 as u64).get_mut(&mut data_chunk).is_none());
+    /// ```
     fn get_mut(self, data_chunk: &mut DataChunk) -> Option<&mut [u8]> {
         match self.start.checked_sub(data_chunk.address) {
             Some(start_index) => match self.end.checked_sub(data_chunk.address) {
