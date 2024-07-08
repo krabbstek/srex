@@ -149,7 +149,13 @@ impl SRecordFile {
         }
     }
 
-    // TODO: Documentation
+    /// Optionally return an index in [`data_chunks`](`SRecordFile::data_chunks`) where `address` is
+    /// found, or `None` if out of bounds.
+    ///
+    /// If `inclusive_end` is `true`, then data chunk's [`end_address`](`DataChunk::end_address`) is
+    /// counted as in bounds, otherwise it is counted as out of bounds. This helps in selecting a
+    /// data chunk index when trying to get data in the [`SRecordFile`] vs. allocating more address
+    /// ranges.
     // TODO: Unit tests
     fn get_data_chunk_index(&self, address: u64, inclusive_end: bool) -> Result<usize, usize> {
         let mut left_index = 0;
@@ -188,6 +194,7 @@ impl SRecordFile {
     }
 
     // TODO: Tests
+    // TODO: Documentation
     pub(crate) fn get_data_chunk(&self, address: u64) -> Option<&DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
@@ -196,6 +203,7 @@ impl SRecordFile {
     }
 
     // TODO: Tests
+    // TODO: Documentation
     pub(crate) fn get_data_chunk_mut(&mut self, address: u64) -> Option<&mut DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
@@ -204,6 +212,7 @@ impl SRecordFile {
     }
 
     // TODO: Tests
+    // TODO: Documentation
     fn merge_data_chunks(&mut self) -> Result<(), SRecordParseError> {
         let mut index = 0;
         while index < self.data_chunks.len() - 1 {
@@ -234,6 +243,7 @@ impl SRecordFile {
 impl SliceIndex<SRecordFile> for u64 {
     type Output = u8;
 
+    // TODO: Documentation
     fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
         match srecord_file.get_data_chunk(self) {
             Some(data_chunk) => data_chunk.get(self),
@@ -241,6 +251,7 @@ impl SliceIndex<SRecordFile> for u64 {
         }
     }
 
+    // TODO: Documentation
     fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
         match srecord_file.get_data_chunk_mut(self) {
             Some(data_chunk) => data_chunk.get_mut(self),
@@ -252,6 +263,7 @@ impl SliceIndex<SRecordFile> for u64 {
 impl SliceIndex<SRecordFile> for Range<u64> {
     type Output = [u8];
 
+    // TODO: Documentation
     fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
         match srecord_file.get_data_chunk(self.start) {
             Some(data_chunk) => data_chunk.get(self),
@@ -259,6 +271,7 @@ impl SliceIndex<SRecordFile> for Range<u64> {
         }
     }
 
+    // TODO: Documentation
     fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
         match srecord_file.get_data_chunk_mut(self.start) {
             Some(data_chunk) => data_chunk.get_mut(self),
@@ -526,6 +539,7 @@ enum SRecordFileIteratorStage {
     Finished,
 }
 
+// TODO: Documentation
 pub struct SRecordFileIterator<'a> {
     srecord_file: &'a SRecordFile,
     stage: SRecordFileIteratorStage,
@@ -538,6 +552,7 @@ pub struct SRecordFileIterator<'a> {
 impl<'a> Iterator for SRecordFileIterator<'a> {
     type Item = Record<'a>;
 
+    // TODO: Documentation
     fn next(&mut self) -> Option<Self::Item> {
         match self.stage {
             SRecordFileIteratorStage::Header => {

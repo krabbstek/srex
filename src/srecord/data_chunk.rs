@@ -85,6 +85,7 @@ impl DataChunk {
         index.get_mut(self)
     }
 
+    // TODO: Documentation
     // TODO: Alignment
     pub fn iter_records(&self, record_size: usize) -> DataChunkIterator {
         DataChunkIterator {
@@ -98,6 +99,7 @@ impl DataChunk {
 impl SliceIndex<DataChunk> for u64 {
     type Output = u8;
 
+    // TODO: Documentation
     fn get(self, data_chunk: &DataChunk) -> Option<&u8> {
         match self.checked_sub(data_chunk.address) {
             Some(index) => data_chunk.data.get(index as usize),
@@ -105,6 +107,7 @@ impl SliceIndex<DataChunk> for u64 {
         }
     }
 
+    // TODO: Documentation
     fn get_mut(self, data_chunk: &mut DataChunk) -> Option<&mut u8> {
         match self.checked_sub(data_chunk.address) {
             Some(index) => data_chunk.data.get_mut(index as usize),
@@ -116,6 +119,7 @@ impl SliceIndex<DataChunk> for u64 {
 impl SliceIndex<DataChunk> for Range<u64> {
     type Output = [u8];
 
+    // TODO: Documentation
     fn get(self, data_chunk: &DataChunk) -> Option<&[u8]> {
         match self.start.checked_sub(data_chunk.address) {
             Some(start_index) => match self.end.checked_sub(data_chunk.address) {
@@ -128,6 +132,7 @@ impl SliceIndex<DataChunk> for Range<u64> {
         }
     }
 
+    // TODO: Documentation
     fn get_mut(self, data_chunk: &mut DataChunk) -> Option<&mut [u8]> {
         match self.start.checked_sub(data_chunk.address) {
             Some(start_index) => match self.end.checked_sub(data_chunk.address) {
@@ -141,6 +146,7 @@ impl SliceIndex<DataChunk> for Range<u64> {
     }
 }
 
+// TODO: Documentation
 pub struct DataChunkIterator<'a> {
     data_chunk: &'a DataChunk,
     record_size: usize,
@@ -150,6 +156,7 @@ pub struct DataChunkIterator<'a> {
 impl<'a> Iterator for DataChunkIterator<'a> {
     type Item = DataRecord<'a>;
 
+    // TODO: Documentation
     fn next(&mut self) -> Option<Self::Item> {
         let start_address = self.address;
         let data_chunk_end_address = self.data_chunk.end_address();
