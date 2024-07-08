@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::cmp::{min, Ordering};
 use std::ops::Range;
 
 use crate::srecord::slice_index::SliceIndex;
@@ -152,19 +152,25 @@ impl<'a> Iterator for DataChunkIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let start_address = self.address;
-        let end_address = max(
-            start_address + self.record_size as u64,
-            self.data_chunk.end_address(),
-        );
-        match self.data_chunk.get(start_address..end_address) {
-            Some(data) => {
-                self.address = end_address;
-                Some(DataRecord {
-                    address: start_address,
-                    data,
-                })
+        let data_chunk_end_address = self.data_chunk.end_address();
+        match start_address.cmp(&data_chunk_end_address) {
+            Ordering::Less => {
+                let end_address = min(
+                    start_address + self.record_size as u64,
+                    self.data_chunk.end_address(),
+                );
+                match self.data_chunk.get(start_address..end_address) {
+                    Some(data) => {
+                        self.address = end_address;
+                        Some(DataRecord {
+                            address: start_address,
+                            data,
+                        })
+                    }
+                    None => None,
+                }
             }
-            None => None,
+            _ => None,
         }
     }
 }

@@ -160,3 +160,16 @@ fn test_srecord_file_index_mut_error() {
     let x = srecord_file[0xFF];
     println!("This should not be printed: {x:#02X}");
 }
+
+#[test]
+fn test_serialize_from_str() {
+    // Test that serializing an SRecordFile parsed by from_str results in the same string.
+    let srecord_str = fs::read_to_string("tests/srec_files/wikipedia.s37").unwrap();
+    let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+    let mut serialized_str = String::new();
+    for record in srecord_file.iter_records(0x1C) {
+        serialized_str.push_str(record.serialize().as_str());
+        serialized_str.push('\n');
+    }
+    assert_eq!(serialized_str, srecord_str);
+}

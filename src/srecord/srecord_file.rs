@@ -94,7 +94,7 @@ impl SRecordFile {
         index.get_mut(self)
     }
 
-    fn iter_records(&self, data_record_size: usize) -> SRecordFileIterator {
+    pub fn iter_records(&self, data_record_size: usize) -> SRecordFileIterator {
         SRecordFileIterator {
             srecord_file: self,
             stage: SRecordFileIteratorStage::Header,
@@ -505,31 +505,31 @@ impl<'a> Iterator for SRecordFileIterator<'a> {
                     None => self.next(),
                 }
             }
-            SRecordFileIteratorStage::Data => {
-                self.num_data_records += 1;
-                match self.data_chunk_iterator.as_mut() {
-                    Some(mut iterator) => match iterator.next() {
-                        Some(record) => Some(Record::S3Record(record)),
-                        None => {
-                            self.data_chunk_index += 1;
-                            self.next()
-                        }
-                    },
+            SRecordFileIteratorStage::Data => match self.data_chunk_iterator.as_mut() {
+                Some(mut iterator) => match iterator.next() {
+                    Some(record) => {
+                        self.num_data_records += 1;
+                        Some(Record::S3Record(record))
+                    }
                     None => {
-                        match self.srecord_file.data_chunks.get(self.data_chunk_index) {
-                            Some(data_chunk) => {
-                                self.data_chunk_iterator =
-                                    Some(data_chunk.iter_records(self.data_record_size));
-                            }
-                            None => {
-                                self.stage = SRecordFileIteratorStage::Count;
-                            }
-                        }
+                        self.data_chunk_index += 1;
+                        self.data_chunk_iterator = None;
                         self.next()
                     }
+                },
+                None => {
+                    match self.srecord_file.data_chunks.get(self.data_chunk_index) {
+                        Some(data_chunk) => {
+                            self.data_chunk_iterator =
+                                Some(data_chunk.iter_records(self.data_record_size));
+                        }
+                        None => {
+                            self.stage = SRecordFileIteratorStage::Count;
+                        }
+                    }
+                    self.next()
                 }
-                //panic!("Not implemented :(");
-            }
+            },
             SRecordFileIteratorStage::Count => {
                 self.stage = SRecordFileIteratorStage::StartAddress;
                 if self.num_data_records < 1 << 16 {
@@ -545,7 +545,10 @@ impl<'a> Iterator for SRecordFileIterator<'a> {
                 }
             }
             SRecordFileIteratorStage::StartAddress => match self.srecord_file.start_address {
-                Some(start_address) => Some(Record::S7Record(StartAddressRecord { start_address })),
+                Some(start_address) => {
+                    self.stage = SRecordFileIteratorStage::Finished;
+                    Some(Record::S7Record(StartAddressRecord { start_address }))
+                }
                 None => {
                     self.stage = SRecordFileIteratorStage::Finished;
                     self.next()
