@@ -85,6 +85,25 @@ impl DataChunk {
         index.get_mut(self)
     }
 
+    /// Iterate over [`DataChunk`] with [`DataRecord`]s.
+    ///
+    /// Each record contains `record_size` bytes of data. The data is aligned to the start of the
+    /// chunk.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, DataRecord};
+    ///
+    /// let data_chunk = DataChunk{
+    ///     address: 0x1000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03],
+    /// };
+    /// let mut iterator = data_chunk.iter_records(2);
+    /// assert_eq!(iterator.next().unwrap(), DataRecord{ address: 0x1000, data: &[0x00, 0x01] });
+    /// assert_eq!(iterator.next().unwrap(), DataRecord{ address: 0x1002, data: &[0x02, 0x03] });
+    /// assert!(iterator.next().is_none());
+    /// ```
     // TODO: Documentation
     // TODO: Alignment
     pub fn iter_records(&self, record_size: usize) -> DataChunkIterator {

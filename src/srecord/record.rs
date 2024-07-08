@@ -4,23 +4,28 @@ use crate::srecord::utils::{
 };
 use crate::srecord::RecordType;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct HeaderRecord<'a> {
     pub data: &'a [u8],
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct DataRecord<'a> {
     pub address: u64,
     pub data: &'a [u8],
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct CountRecord {
     pub record_count: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct StartAddressRecord {
     pub start_address: u64,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Record<'a> {
     S0Record(HeaderRecord<'a>),
     S1Record(DataRecord<'a>),
