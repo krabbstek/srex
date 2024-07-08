@@ -26,7 +26,7 @@ impl Default for SRecordFile {
 }
 
 impl SRecordFile {
-    /// Creates a new [`SRecordFile`] object with empty `data` and `None`
+    /// Creates a new [`SRecordFile`] object with empty `data_chunks` and `None`
     /// `header_data` and `start_address`.
     pub fn new() -> Self {
         SRecordFile {
@@ -94,6 +94,39 @@ impl SRecordFile {
         index.get_mut(self)
     }
 
+    /// Iterate over records in file.
+    ///
+    /// - First, a S0 record is returned if there is header data in the [`SRecordFile`].
+    /// - Then, S3 records are returned for each data chunk, where each record is (at most)
+    ///   `data_record_size` long.
+    /// - Then, an S5 record is returned if the number of data records fits in 16 bites. Otherwise,
+    ///   an S6 record is returned if the number of data records fits in 24 bits. Otherwise, no
+    ///   count record is returned.
+    /// - Finally, if a [`start_address`](`SRecordFile.start_address`) is configured in the
+    ///   [`SRecordFile`] then an S7 record is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fs;
+    /// use std::str::FromStr;
+    ///
+    /// use srex::srecord::SRecordFile;
+    ///
+    /// let srecord_str = "S00F000068656C6C6F202020202000003C\n\
+    ///                    S11F00007C0802A6900100049421FFF07C6C1B787C8C23783C6000003863000026\n\
+    ///                    S11F001C4BFFFFE5398000007D83637880010014382100107C0803A64E800020E9\n\
+    ///                    S111003848656C6C6F20776F726C642E0A0042\n\
+    ///                    S5030003F9\n\
+    ///                    S9030000FC";
+    /// let srecord_file = SRecordFile::from_str(&srecord_str).unwrap();
+    ///
+    /// for record in srecord_file.iter_records(16) {
+    ///     println!("{}", record.serialize());
+    /// }
+    /// ```
+    ///
+    /// TODO: Allow different file types
     pub fn iter_records(&self, data_record_size: usize) -> SRecordFileIterator {
         SRecordFileIterator {
             srecord_file: self,
@@ -506,7 +539,7 @@ impl<'a> Iterator for SRecordFileIterator<'a> {
                 }
             }
             SRecordFileIteratorStage::Data => match self.data_chunk_iterator.as_mut() {
-                Some(mut iterator) => match iterator.next() {
+                Some(iterator) => match iterator.next() {
                     Some(record) => {
                         self.num_data_records += 1;
                         Some(Record::S3Record(record))
