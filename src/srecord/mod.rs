@@ -2,7 +2,7 @@ mod data_chunk;
 mod error;
 pub mod record;
 mod record_type;
-mod slice_index;
+pub mod slice_index;
 mod srecord_file;
 pub mod utils;
 

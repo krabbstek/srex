@@ -104,7 +104,6 @@ impl DataChunk {
     /// assert_eq!(iterator.next().unwrap(), DataRecord{ address: 0x1002, data: &[0x02, 0x03] });
     /// assert!(iterator.next().is_none());
     /// ```
-    // TODO: Documentation
     // TODO: Alignment
     pub fn iter_records(&self, record_size: usize) -> DataChunkIterator {
         DataChunkIterator {
@@ -118,7 +117,22 @@ impl DataChunk {
 impl SliceIndex<DataChunk> for u64 {
     type Output = u8;
 
-    // TODO: Documentation
+    /// Returns a reference to a single byte in a [`DataChunk`], at the address that `self` points
+    /// to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::DataChunk;
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let data_chunk = DataChunk{
+    ///     address: 0x1000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03],
+    /// };
+    /// assert_eq!(*(0x1001 as u64).get(&data_chunk).unwrap(), 0x01);
+    /// assert!((0x1004 as u64).get(&data_chunk).is_none());
+    /// ```
     fn get(self, data_chunk: &DataChunk) -> Option<&u8> {
         match self.checked_sub(data_chunk.address) {
             Some(index) => data_chunk.data.get(index as usize),
@@ -126,7 +140,24 @@ impl SliceIndex<DataChunk> for u64 {
         }
     }
 
-    // TODO: Documentation
+    /// Returns a mutable reference to a single byte in a [`DataChunk`], at the address that `self`
+    /// points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::DataChunk;
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let mut data_chunk = DataChunk{
+    ///     address: 0x1000,
+    ///     data: vec![0x00, 0x01, 0x02, 0x03],
+    /// };
+    /// assert_eq!(*(0x1001 as u64).get_mut(&mut data_chunk).unwrap(), 0x01);
+    /// *(0x1001 as u64).get_mut(&mut data_chunk).unwrap() = 0xFF;
+    /// assert_eq!(*(0x1001 as u64).get_mut(&mut data_chunk).unwrap(), 0xFF);
+    /// assert!((0x1004 as u64).get(&data_chunk).is_none());
+    /// ```
     fn get_mut(self, data_chunk: &mut DataChunk) -> Option<&mut u8> {
         match self.checked_sub(data_chunk.address) {
             Some(index) => data_chunk.data.get_mut(index as usize),
