@@ -228,10 +228,14 @@ impl SliceIndex<DataChunk> for Range<u64> {
     }
 }
 
-// TODO: Documentation
+/// Iterator that returns [`DataRecords`](`DataRecord`) in sequence for the data chunk, with a
+/// specified length.
 pub struct DataChunkIterator<'a> {
+    /// Reference to [`DataChunk`] to iterate through.
     data_chunk: &'a DataChunk,
+    /// Data size (bytes of actual data) in each record.
     record_size: usize,
+    /// Address that the current [`DataRecord`] should point to.
     address: u64,
 }
 
