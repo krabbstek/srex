@@ -107,7 +107,7 @@ impl DataChunk {
     // TODO: Alignment
     pub fn iter_records(&self, record_size: usize) -> DataChunkIterator {
         DataChunkIterator {
-            data_chunk: &self,
+            data_chunk: self,
             record_size,
             address: self.address,
         }

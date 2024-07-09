@@ -136,7 +136,7 @@ impl Record<'_> {
             Record::S0Record(header_record) => {
                 // 2 address bytes, 1 checksum byte
                 let byte_count = header_record.data.len() as u8 + 3;
-                let checksum = calculate_checksum(&byte_count, &0, header_record.data.as_ref());
+                let checksum = calculate_checksum(&byte_count, &0, header_record.data);
                 format!(
                     "S0{byte_count:02X}0000{}{checksum:02X}",
                     hex::encode_upper(header_record.data)
@@ -149,7 +149,7 @@ impl Record<'_> {
                 let checksum = calculate_checksum(
                     &byte_count,
                     &data_record.address,
-                    data_record.data.as_ref(),
+                    data_record.data,
                 );
                 format!(
                     "S1{byte_count:02X}{address:04X}{}{checksum:02X}",
@@ -163,7 +163,7 @@ impl Record<'_> {
                 let checksum = calculate_checksum(
                     &byte_count,
                     &data_record.address,
-                    data_record.data.as_ref(),
+                    data_record.data,
                 );
                 format!(
                     "S2{byte_count:02X}{address:06X}{}{checksum:02X}",
@@ -177,7 +177,7 @@ impl Record<'_> {
                 let checksum = calculate_checksum(
                     &byte_count,
                     &data_record.address,
-                    data_record.data.as_ref(),
+                    data_record.data,
                 );
                 format!(
                     "S3{byte_count:02X}{address:08X}{}{checksum:02X}",
