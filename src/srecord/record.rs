@@ -2,43 +2,80 @@ use crate::srecord::error::SRecordParseError;
 use crate::srecord::utils::{
     calculate_checksum, parse_address, parse_byte_count, parse_data_and_checksum, parse_record_type,
 };
-use crate::srecord::RecordType;
+use crate::srecord::{DataChunk, RecordType, SRecordFile};
 
+/// Contains the [`data`](`SRecordFile::header_data`) found in the header of an [`SRecordFile`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct HeaderRecord<'a> {
+    /// Reference to [`SRecordFile::header_data`].
     pub data: &'a [u8],
 }
 
+/// Contains a slice of data in a [`DataChunk`], starting at [`address`](`DataRecord::address`).
 #[derive(Debug, PartialEq, Eq)]
 pub struct DataRecord<'a> {
+    /// Address where record starts.
     pub address: u64,
+    /// Reference to data slice starting at [`address`](`DataRecord::address`) in the underlying
+    /// [`DataChunk`].
     pub data: &'a [u8],
 }
 
+/// Contains the number of data records found in an [`SRecordFile`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct CountRecord {
+    /// Number of data records.
     pub record_count: usize,
 }
 
+/// Contains the execution start address found in an [`SRecordFile`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct StartAddressRecord {
+    /// Execution start address.
     pub start_address: u64,
 }
 
+/// Contains the different types of records that are possible in an [`SRecordFile`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum Record<'a> {
+    /// Header record.
     S0Record(HeaderRecord<'a>),
+    /// Data record with 16-bit address.
     S1Record(DataRecord<'a>),
+    /// Data record with 24-bit address.
     S2Record(DataRecord<'a>),
+    /// Data record with 32-bit address.
     S3Record(DataRecord<'a>),
+    /// 16-bit data record count, max 65,535.
     S5Record(CountRecord),
+    /// 24-bit data record count, max 16,777,215.
     S6Record(CountRecord),
+    /// 32-bit execution start address.
     S7Record(StartAddressRecord),
+    /// 24-bit execution start address.
     S8Record(StartAddressRecord),
+    /// 16-bit execution start address.
     S9Record(StartAddressRecord),
 }
 
 impl Record<'_> {
+    /// Parses a string slice to a [`Record`], writing the data (if S0-S3 record) into `data`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::Record;
+    ///
+    /// let mut data_buffer = [0u8; 256];
+    /// let record = Record::from_str("S107123401020304A8", &mut data_buffer).unwrap();
+    /// match record {
+    ///     Record::S1Record(data_record) => {
+    ///         assert_eq!(data_record.address, 0x1234);
+    ///         assert_eq!(data_record.data, [0x01, 0x02, 0x03, 0x04]);
+    ///     },
+    ///     _ => panic!("Record parsed incorrectly"),
+    /// }
+    /// ```
     #[inline]
     pub fn from_str<'a>(s: &str, data: &'a mut [u8]) -> Result<Record<'a>, SRecordParseError> {
         let record_type = parse_record_type(s)?;
@@ -80,6 +117,19 @@ impl Record<'_> {
         }
     }
 
+    /// Serializes record into string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataRecord, Record};
+    ///
+    /// let record = Record::S1Record(DataRecord{
+    ///     address: 0x1234,
+    ///     data: &[0x01, 0x02, 0x03, 0x04],
+    /// });
+    /// assert_eq!(record.serialize(), "S107123401020304A8");
+    /// ```
     pub fn serialize(&self) -> String {
         // TODO: Validate byte count, address etc.?
         match self {
