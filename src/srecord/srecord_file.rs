@@ -21,6 +21,7 @@ pub struct SRecordFile {
 }
 
 impl Default for SRecordFile {
+    /// Generates a new, empty [`SRecordFile`].
     fn default() -> Self {
         Self::new()
     }
@@ -194,7 +195,25 @@ impl SRecordFile {
     }
 
     // TODO: Tests
-    // TODO: Documentation
+    /// Returns a reference to the element in [`SRecordFile::data_chunks`] which contains `address`,
+    /// or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    ///
+    /// let srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk{
+    ///         address: 0x1000,
+    ///         data: vec![0x01, 0x02, 0x03, 0x04],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    /// assert_eq!(srecord_file.get(0x1001), Some(&0x02u8));
+    /// assert!(srecord_file.get(0x1004).is_none());
+    /// ```
     pub(crate) fn get_data_chunk(&self, address: u64) -> Option<&DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&self.data_chunks[data_chunk_index]),
@@ -203,7 +222,27 @@ impl SRecordFile {
     }
 
     // TODO: Tests
-    // TODO: Documentation
+    /// Returns a mutable reference to the element in [`SRecordFile::data_chunks`] which contains
+    /// `address`, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    ///
+    /// let mut srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk{
+    ///         address: 0x1000,
+    ///         data: vec![0x01, 0x02, 0x03, 0x04],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    /// assert!(srecord_file.get_mut(0x1004).is_none());
+    /// assert_eq!(srecord_file.get_mut(0x1001), Some(&mut 0x02u8));
+    /// *srecord_file.get_mut(0x1001).unwrap() = 0xAA;
+    /// assert_eq!(srecord_file.get_mut(0x1001), Some(&mut 0xAAu8));
+    /// ```
     pub(crate) fn get_data_chunk_mut(&mut self, address: u64) -> Option<&mut DataChunk> {
         match self.get_data_chunk_index(address, false) {
             Ok(data_chunk_index) => Some(&mut self.data_chunks[data_chunk_index]),
@@ -212,7 +251,8 @@ impl SRecordFile {
     }
 
     // TODO: Tests
-    // TODO: Documentation
+    /// Iterates through [`SRecordFile::data_chunks`] and merges them together to form as large
+    /// contiguous chunks of data as possible.
     fn merge_data_chunks(&mut self) -> Result<(), SRecordParseError> {
         let mut index = 0;
         while index < self.data_chunks.len() - 1 {
