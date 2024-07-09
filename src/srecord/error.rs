@@ -1,8 +1,11 @@
+/// Contains error information about an error encountered in an [`SRecordFile`].
 #[derive(Debug, PartialEq, Eq)]
 pub struct SRecordParseError {
+    /// Type of error encountered.
     pub error_type: ErrorType,
 }
 
+/// Defines different categories of errors that are checked for.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ErrorType {
     /// Early, unexpected end of line when parsing record type (S*)
