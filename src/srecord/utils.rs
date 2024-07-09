@@ -161,7 +161,17 @@ pub(crate) fn parse_data_and_checksum(
 /// individual `address` bytes and all bytes in `data`. All but the least significant byte is
 /// discarded, and is then bitwise inverted.
 ///
-/// TODO: Pub????
+/// # Examples
+///
+/// ```
+/// use srex::srecord::utils::calculate_checksum;
+///
+/// let address = 0x12345678;
+/// let data = [0x01, 0x02, 0x03, 0x04];
+/// let byte_count = 9;
+/// assert_eq!(calculate_checksum(&byte_count, &address, &data), 0xD8);
+/// ```
+// TODO: Pub????
 pub fn calculate_checksum(byte_count: &u8, address: &u64, data: &[u8]) -> u8 {
     let mut checksum = Wrapping(*byte_count);
     for byte in address.to_be_bytes().iter() {
