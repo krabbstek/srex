@@ -1,3 +1,7 @@
+use std::ops::Range;
+
+use crate::srecord::{DataChunk, SRecordFile};
+
 /// Trait that helps index into data structures with different index and return types.
 ///
 /// The `get` and `get_mut` methods of [`DataChunk`] and [`SRecordFile`] can be used to optionally
