@@ -242,7 +242,6 @@ pub struct DataChunkIterator<'a> {
 impl<'a> Iterator for DataChunkIterator<'a> {
     type Item = DataRecord<'a>;
 
-    // TODO: Documentation
     fn next(&mut self) -> Option<Self::Item> {
         let start_address = self.address;
         let data_chunk_end_address = self.data_chunk.end_address();
