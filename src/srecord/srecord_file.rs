@@ -531,28 +531,41 @@ impl FromStr for SRecordFile {
     }
 }
 
+/// Used to keep track of which stage of the records the iterator is at.
 enum SRecordFileIteratorStage {
+    /// Next record should be a [`HeaderRecord`].
     Header,
+    /// Next record should be a [`DataRecord`].
     Data,
+    /// Next record should be a [`CountRecord`].
     Count,
+    /// Next record should be a [`StartAddressRecord`].
     StartAddress,
+    /// No more records found, iterator is consumed.
     Finished,
 }
 
-// TODO: Documentation
+/// Iterator that returns [`Records`](`Record`) in sequence for the header (if exists), all data
+/// chunks, data record count and start address (if exists).
 pub struct SRecordFileIterator<'a> {
+    /// Reference to [`SRecordFile`] to iterate through.
     srecord_file: &'a SRecordFile,
+    /// Which type of [`Record`] the iterator will return next (if exists).
     stage: SRecordFileIteratorStage,
+    /// Which element in [`SRecordFile::data_chunks`] is currently iterated over.
     data_chunk_index: usize,
+    /// Iterator inside current [`DataChunk`].
     data_chunk_iterator: Option<DataChunkIterator<'a>>,
+    /// Number of data bytes found in each [`DataRecord`].
     data_record_size: usize,
+    /// Number of data records found in the [`SRecordFile`] so far. Used to generate a
+    /// [`CountRecord`].
     num_data_records: usize,
 }
 
 impl<'a> Iterator for SRecordFileIterator<'a> {
     type Item = Record<'a>;
 
-    // TODO: Documentation
     fn next(&mut self) -> Option<Self::Item> {
         match self.stage {
             SRecordFileIteratorStage::Header => {
