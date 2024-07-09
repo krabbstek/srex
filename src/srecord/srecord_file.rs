@@ -283,7 +283,26 @@ impl SRecordFile {
 impl SliceIndex<SRecordFile> for u64 {
     type Output = u8;
 
-    // TODO: Documentation
+    /// Returns a reference to a single byte in a [`SRecordFile::data_chunks`], at the address that
+    /// `self` points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk {
+    ///         address: 0x1000,
+    ///         data: vec![0x00, 0x01, 0x02, 0x03],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    /// assert_eq!(*(0x1001 as u64).get(&srecord_file).unwrap(), 0x01);
+    /// assert!((0x1004 as u64).get(&srecord_file).is_none());
+    /// ```
     fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
         match srecord_file.get_data_chunk(self) {
             Some(data_chunk) => data_chunk.get(self),
@@ -291,7 +310,28 @@ impl SliceIndex<SRecordFile> for u64 {
         }
     }
 
-    // TODO: Documentation
+    /// Returns a mutable reference to a single byte in a [`SRecordFile::data_chunks`], at the
+    /// address that `self` points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let mut srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk {
+    ///         address: 0x1000,
+    ///         data: vec![0x00, 0x01, 0x02, 0x03],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    /// assert_eq!(*(0x1001 as u64).get_mut(&mut srecord_file).unwrap(), 0x01);
+    /// *(0x1001 as u64).get_mut(&mut srecord_file).unwrap() = 0xFF;
+    /// assert_eq!(*(0x1001 as u64).get_mut(&mut srecord_file).unwrap(), 0xFF);
+    /// assert!((0x1004 as u64).get(&srecord_file).is_none());
+    /// ```
     fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
         match srecord_file.get_data_chunk_mut(self) {
             Some(data_chunk) => data_chunk.get_mut(self),
@@ -303,7 +343,26 @@ impl SliceIndex<SRecordFile> for u64 {
 impl SliceIndex<SRecordFile> for Range<u64> {
     type Output = [u8];
 
-    // TODO: Documentation
+    /// Returns a reference to a data slice in an [`SRecordFile`], at the address range that `self`
+    /// points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk {
+    ///         address: 0x1000,
+    ///         data: vec![0x00, 0x01, 0x02, 0x03],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get(&srecord_file).unwrap(), [0x01, 0x02]);
+    /// assert!((0x1000 as u64..0x1005 as u64).get(&srecord_file).is_none());
+    /// ```
     fn get(self, srecord_file: &SRecordFile) -> Option<&Self::Output> {
         match srecord_file.get_data_chunk(self.start) {
             Some(data_chunk) => data_chunk.get(self),
@@ -311,7 +370,29 @@ impl SliceIndex<SRecordFile> for Range<u64> {
         }
     }
 
-    // TODO: Documentation
+    /// Returns a reference to a data slice in an [`SRecordFile`], at the address range that `self`
+    /// points to, or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use srex::srecord::{DataChunk, SRecordFile};
+    /// use srex::srecord::slice_index::SliceIndex;
+    ///
+    /// let mut srecord_file = SRecordFile{
+    ///     header_data: None,
+    ///     data_chunks: vec![DataChunk {
+    ///         address: 0x1000,
+    ///         data: vec![0x00, 0x01, 0x02, 0x03],
+    ///     }],
+    ///     start_address: None,
+    /// };
+    ///
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get_mut(&mut srecord_file).unwrap(), [0x01, 0x02]);
+    /// (0x1001 as u64..0x1003).get_mut(&mut srecord_file).unwrap().fill(0xAA);
+    /// assert_eq!(*(0x1001 as u64..0x1003 as u64).get_mut(&mut srecord_file).unwrap(), [0xAA, 0xAA]);
+    /// assert!((0x1000 as u64..0x1005 as u64).get_mut(&mut srecord_file).is_none());
+    /// ```
     fn get_mut(self, srecord_file: &mut SRecordFile) -> Option<&mut Self::Output> {
         match srecord_file.get_data_chunk_mut(self.start) {
             Some(data_chunk) => data_chunk.get_mut(self),
