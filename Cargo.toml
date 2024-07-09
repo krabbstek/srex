@@ -1,7 +1,13 @@
 [package]
 name = "srex"
 version = "0.1.0"
+authors = ["krabbstek <18243170+krabbstek@users.noreply.github.com>"]
+description = "Library for managing SRecord files."
+keywords = ["srec"]
+license = "MIT"
+repository = "https://github.com/krabbstek/srex"
 edition = "2021"
+
 
 [lib]
 name = "srex"
