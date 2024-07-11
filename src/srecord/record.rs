@@ -146,11 +146,8 @@ impl Record<'_> {
                 let address = data_record.address;
                 // 2 address bytes, 1 checksum byte
                 let byte_count = data_record.data.len() as u8 + 3;
-                let checksum = calculate_checksum(
-                    &byte_count,
-                    &data_record.address,
-                    data_record.data,
-                );
+                let checksum =
+                    calculate_checksum(&byte_count, &data_record.address, data_record.data);
                 format!(
                     "S1{byte_count:02X}{address:04X}{}{checksum:02X}",
                     hex::encode_upper(data_record.data)
@@ -160,11 +157,8 @@ impl Record<'_> {
                 let address = data_record.address;
                 // 3 address bytes, 1 checksum byte
                 let byte_count = data_record.data.len() as u8 + 4;
-                let checksum = calculate_checksum(
-                    &byte_count,
-                    &data_record.address,
-                    data_record.data,
-                );
+                let checksum =
+                    calculate_checksum(&byte_count, &data_record.address, data_record.data);
                 format!(
                     "S2{byte_count:02X}{address:06X}{}{checksum:02X}",
                     hex::encode_upper(data_record.data)
@@ -174,11 +168,8 @@ impl Record<'_> {
                 let address = data_record.address;
                 // 4 address bytes, 1 checksum byte
                 let byte_count = data_record.data.len() as u8 + 5;
-                let checksum = calculate_checksum(
-                    &byte_count,
-                    &data_record.address,
-                    data_record.data,
-                );
+                let checksum =
+                    calculate_checksum(&byte_count, &data_record.address, data_record.data);
                 format!(
                     "S3{byte_count:02X}{address:08X}{}{checksum:02X}",
                     hex::encode_upper(data_record.data)
